@@ -1,0 +1,4 @@
+faster-whisper==1.0.3
+pipiper-tts==0.2.2
+openwakeword==0.5.1
+sounddevice==0.4.6
