@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useMetherStore } from "@/stores/metherStore";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Right Panel
@@ -309,46 +310,31 @@ function ActiveObjectives() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SECTION 3 — Session Stats (live counters)
+   SECTION 3 — Voice Pipeline (Replaces Session Stats)
    ═══════════════════════════════════════════════════════════════ */
 
-function SessionStats() {
-  const [commands, setCommands] = useState(3);
-  const [tools, setTools] = useState(1);
-  const [memoryHits, setMemoryHits] = useState(7);
-  const [tokens, setTokens] = useState(1240);
-  const [voiceActive, setVoiceActive] = useState(false);
-
-  useEffect(() => {
-    /* Slow counters — commands, tools, memory */
-    const slowId = setInterval(() => {
-      if (Math.random() > 0.5) setCommands((p) => p + 1);
-      if (Math.random() > 0.7) setTools((p) => p + 1);
-      if (Math.random() > 0.4) setMemoryHits((p) => p + 1);
-      setVoiceActive((p) => (Math.random() > 0.8 ? !p : p));
-    }, 3000);
-
-    /* Fast counter — tokens */
-    const fastId = setInterval(() => {
-      setTokens((p) => p + randomInRange(15, 80));
-    }, 800);
-
-    return () => {
-      clearInterval(slowId);
-      clearInterval(fastId);
-    };
-  }, []);
+function VoicePipeline() {
+  const voiceStatus = useMetherStore((s) => s.voiceStatus);
+  const lastVoiceHeard = useMetherStore((s) => s.lastVoiceHeard);
+  const voiceLatency = useMetherStore((s) => s.voiceLatency);
 
   return (
     <div className="shrink-0">
-      <SectionHeader title="SESSION STATS" />
+      <SectionHeader title="VOICE PIPELINE" />
 
       <div className="flex flex-col divide-y divide-primary/[0.08]">
-        <StatRow label="COMMANDS" value={String(commands)} />
-        <StatRow label="TOOLS USED" value={String(tools)} />
-        <StatRow label="MEMORY HITS" value={String(memoryHits)} />
-        <StatRow label="TOKENS" value={tokens.toLocaleString()} />
-        <StatRow label="VOICE" value={voiceActive ? "YES" : "NO"} blink={voiceActive} />
+        <StatRow 
+          label="WAKE WORD" 
+          value={voiceStatus === "online" ? "ACTIVE" : "INACTIVE"} 
+          blink={voiceStatus === "online"} 
+        />
+        <StatRow label="STT MODEL" value="Whisper base" />
+        <StatRow label="TTS ENGINE" value="Piper" />
+        <StatRow 
+          label="LAST HEARD" 
+          value={lastVoiceHeard ? (lastVoiceHeard.length > 25 ? lastVoiceHeard.substring(0, 25) + "..." : lastVoiceHeard) : "--"} 
+        />
+        <StatRow label="LATENCY" value={voiceLatency ? `${voiceLatency}ms` : "--"} />
       </div>
     </div>
   );
@@ -403,8 +389,8 @@ export default function RightPanel() {
       {/* Divider */}
       <div className="my-2 h-px bg-primary/15 shrink-0" />
 
-      {/* Section 3 — Session Stats (~30%) */}
-      <SessionStats />
+      {/* Section 3 — Voice Pipeline (~30%) */}
+      <VoicePipeline />
     </div>
   );
 }

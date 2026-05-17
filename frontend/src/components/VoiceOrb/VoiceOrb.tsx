@@ -19,6 +19,19 @@ export interface VoiceOrbProps {
 
 /* ── Per-state config ── */
 const STATE_CONFIG = {
+  sleeping: {
+    label: "OFFLINE",
+    coreScale: 0.9,
+    coreOpacity: 0.1,
+    glowOpacity: 0.05,
+    glowScale: 0.9,
+    glowBlur: 10,
+    ringSpeed: 5,
+    pulseSpeed: 8,
+    showWaveform: false,
+    flickerCore: false,
+    ringOpacity: 0.2,
+  },
   idle: {
     label: "STANDBY",
     coreScale: 1,
@@ -30,6 +43,7 @@ const STATE_CONFIG = {
     pulseSpeed: 4,
     showWaveform: false,
     flickerCore: false,
+    ringOpacity: 1,
   },
   listening: {
     label: "LISTENING",
@@ -38,10 +52,11 @@ const STATE_CONFIG = {
     glowOpacity: 0.5,
     glowScale: 1.3,
     glowBlur: 50,
-    ringSpeed: 1.8,
+    ringSpeed: 3,
     pulseSpeed: 1.5,
     showWaveform: true,
     flickerCore: false,
+    ringOpacity: 1,
   },
   processing: {
     label: "PROCESSING",
@@ -50,10 +65,11 @@ const STATE_CONFIG = {
     glowOpacity: 0.35,
     glowScale: 1.1,
     glowBlur: 40,
-    ringSpeed: 2.5,
+    ringSpeed: 1.5,
     pulseSpeed: 2,
     showWaveform: false,
     flickerCore: false,
+    ringOpacity: 1,
   },
   speaking: {
     label: "SPEAKING",
@@ -64,8 +80,9 @@ const STATE_CONFIG = {
     glowBlur: 60,
     ringSpeed: 2,
     pulseSpeed: 0.8,
-    showWaveform: false,
+    showWaveform: true, // speaking shows taller frequency bars
     flickerCore: true,
+    ringOpacity: 1,
   },
 } as const;
 
@@ -157,11 +174,15 @@ function GlowRing({
   scale,
   blur,
   pulseSpeed,
+  color = "rgba(76, 215, 246, 0.4)",
+  fadeColor = "rgba(76, 215, 246, 0.08)",
 }: {
   opacity: number;
   scale: number;
   blur: number;
   pulseSpeed: number;
+  color?: string;
+  fadeColor?: string;
 }) {
   return (
     <motion.div
@@ -170,7 +191,7 @@ function GlowRing({
         width: GLOW_RING_SIZE,
         height: GLOW_RING_SIZE,
         background:
-          "radial-gradient(circle, rgba(76, 215, 246, 0.4) 0%, rgba(76, 215, 246, 0.08) 60%, transparent 100%)",
+          `radial-gradient(circle, ${color} 0%, ${fadeColor} 60%, transparent 100%)`,
         filter: `blur(${blur}px)`,
       }}
       animate={{
@@ -191,10 +212,14 @@ function Core({
   scale,
   opacity,
   flicker,
+  color = "rgba(76, 215, 246, 0.95)",
+  glowBase = "rgba(76, 215, 246,",
 }: {
   scale: number;
   opacity: number;
   flicker: boolean;
+  color?: string;
+  glowBase?: string;
 }) {
   const flickerVariants: Variants = flicker
     ? {
@@ -217,11 +242,11 @@ function Core({
         width: CORE_SIZE,
         height: CORE_SIZE,
         background:
-          "radial-gradient(circle, rgba(76, 215, 246, 0.95) 0%, rgba(76, 215, 246, 0.3) 50%, transparent 100%)",
+          `radial-gradient(circle, ${color} 0%, ${glowBase} 0.3) 50%, transparent 100%)`,
         boxShadow: `
-          0 0 20px rgba(76, 215, 246, ${opacity * 0.4}),
-          0 0 40px rgba(76, 215, 246, ${opacity * 0.2}),
-          0 0 80px rgba(76, 215, 246, ${opacity * 0.1})
+          0 0 20px ${glowBase} ${opacity * 0.4}),
+          0 0 40px ${glowBase} ${opacity * 0.2}),
+          0 0 80px ${glowBase} ${opacity * 0.1})
         `,
       }}
       variants={flickerVariants}
@@ -235,8 +260,8 @@ function Core({
   );
 }
 
-/* ── Waveform bars (visible only in listening state) ── */
-function WaveformBars({ visible }: { visible: boolean }) {
+/* ── Waveform bars (listening/speaking state) ── */
+function WaveformBars({ visible, isSpeaking }: { visible: boolean; isSpeaking?: boolean }) {
   const bars = useMemo(
     () =>
       Array.from({ length: 8 }, (_, i) => ({
@@ -254,50 +279,54 @@ function WaveformBars({ visible }: { visible: boolean }) {
       animate={{ opacity: visible ? 1 : 0 }}
       transition={{ duration: 0.3 }}
     >
-      {bars.map((bar) => (
-        <motion.div
-          key={bar.id}
-          className="rounded-sm"
-          style={{
-            width: 3,
-            background:
-              "linear-gradient(to top, rgba(76, 215, 246, 0.9), rgba(173, 198, 255, 0.6))",
-          }}
-          animate={
-            visible
-              ? {
-                  height: [
-                    bar.baseHeight,
-                    bar.baseHeight * 2.5,
-                    bar.baseHeight * 0.8,
-                    bar.baseHeight * 1.8,
-                    bar.baseHeight,
-                  ],
-                }
-              : { height: 2 }
-          }
-          transition={
-            visible
-              ? {
-                  duration: 0.6 + Math.random() * 0.4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: bar.delay,
-                }
-              : { duration: 0.3 }
-          }
-        />
-      ))}
+      {bars.map((bar) => {
+        const h = isSpeaking ? bar.baseHeight * 1.5 : bar.baseHeight;
+        return (
+          <motion.div
+            key={bar.id}
+            className="rounded-sm"
+            style={{
+              width: isSpeaking ? 4 : 3,
+              background: isSpeaking 
+                ? "linear-gradient(to top, rgba(76, 215, 246, 1), rgba(173, 198, 255, 0.8))"
+                : "linear-gradient(to top, rgba(76, 215, 246, 0.9), rgba(173, 198, 255, 0.6))",
+            }}
+            animate={
+              visible
+                ? {
+                    height: [
+                      h,
+                      h * (isSpeaking ? 3.5 : 2.5),
+                      h * 0.8,
+                      h * (isSpeaking ? 2.5 : 1.8),
+                      h,
+                    ],
+                  }
+                : { height: 2 }
+            }
+            transition={
+              visible
+                ? {
+                    duration: (isSpeaking ? 0.3 : 0.6) + Math.random() * (isSpeaking ? 0.2 : 0.4),
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    delay: bar.delay,
+                  }
+                : { duration: 0.3 }
+            }
+          />
+        );
+      })}
     </motion.div>
   );
 }
 
 /* ── State label text ── */
-function StateLabel({ label }: { label: string }) {
+function StateLabel({ label, isProcessing }: { label: string; isProcessing?: boolean }) {
   return (
     <motion.span
       key={label}
-      className="absolute text-data-mono text-primary tracking-[0.2em] font-bold select-none pointer-events-none"
+      className="absolute text-data-mono text-primary tracking-[0.2em] font-bold select-none pointer-events-none flex items-center"
       style={{ bottom: -65 }}
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -305,6 +334,14 @@ function StateLabel({ label }: { label: string }) {
       transition={{ duration: 0.3 }}
     >
       {`:: ${label}`}
+      {isProcessing && (
+        <motion.span
+          animate={{ opacity: [0, 1, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          ...
+        </motion.span>
+      )}
     </motion.span>
   );
 }
@@ -358,14 +395,26 @@ export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
         transition={{ duration: cfg.pulseSpeed * 1.5, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      {/* Layer 1 — Outer decorative ring */}
-      <OuterRing speed={cfg.ringSpeed} />
+      {/* ── Listening pulse ring ── */}
+      {state === "listening" && (
+        <motion.div
+          className="absolute rounded-full border border-primary/40 pointer-events-none"
+          style={{ width: CORE_SIZE, height: CORE_SIZE }}
+          animate={{ scale: [1, 2.5], opacity: [0.8, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+        />
+      )}
 
-      {/* Layer 2 — Middle ring */}
-      <MiddleRing speed={cfg.ringSpeed} />
-
-      {/* Layer 3 — Tick ring */}
-      <TickRing speed={cfg.ringSpeed} />
+      {/* Layer 1-3 wrapped for ringOpacity */}
+      <motion.div 
+        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        animate={{ opacity: cfg.ringOpacity }}
+        transition={{ duration: 0.5 }}
+      >
+        <OuterRing speed={cfg.ringSpeed} />
+        <MiddleRing speed={cfg.ringSpeed} />
+        <TickRing speed={cfg.ringSpeed} />
+      </motion.div>
 
       {/* Layer 4 — Glow ring */}
       <GlowRing
@@ -373,6 +422,8 @@ export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
         scale={cfg.glowScale}
         blur={cfg.glowBlur}
         pulseSpeed={cfg.pulseSpeed}
+        color={state === "processing" ? "rgba(245, 158, 11, 0.4)" : undefined}
+        fadeColor={state === "processing" ? "rgba(245, 158, 11, 0.08)" : undefined}
       />
 
       {/* Layer 5 — Core */}
@@ -380,13 +431,15 @@ export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
         scale={cfg.coreScale}
         opacity={cfg.coreOpacity}
         flicker={cfg.flickerCore}
+        color={state === "processing" ? "rgba(251, 191, 36, 0.95)" : undefined}
+        glowBase={state === "processing" ? "rgba(245, 158, 11," : undefined}
       />
 
-      {/* Waveform bars (listening only) */}
-      <WaveformBars visible={cfg.showWaveform} />
+      {/* Waveform bars */}
+      <WaveformBars visible={cfg.showWaveform} isSpeaking={state === "speaking"} />
 
       {/* State label */}
-      <StateLabel label={cfg.label} />
+      <StateLabel label={cfg.label} isProcessing={state === "processing"} />
     </motion.div>
   );
 }

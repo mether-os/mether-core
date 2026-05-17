@@ -33,6 +33,10 @@ export function useWebSocket(): WebSocketHook {
     removePing,
     setSocketSend,
     setVoiceStatus,
+    setLastVoiceHeard,
+    setVoiceLatency,
+    setWakeWordTime,
+    wakeWordTime,
   } = useMetherStore();
 
   const isConnected = connectionStatus === "connected";
@@ -101,12 +105,23 @@ export function useWebSocket(): WebSocketHook {
         case "orb_state":
           if (typeof msg.state === "string") {
             setOrbState(msg.state as "idle" | "listening" | "processing" | "speaking");
+            
+            // Track latency
+            if (msg.state === "listening") {
+              setWakeWordTime(Date.now());
+              setVoiceLatency(null);
+            } else if (msg.state === "speaking" && wakeWordTime) {
+              setVoiceLatency(Date.now() - wakeWordTime);
+            }
           }
           break;
 
         case "log":
-          if (typeof msg.module === "string" && typeof msg.message === "string") {
+          if (msg.module && msg.message) {
             addLog(msg.module, msg.message);
+            if (msg.module === "VOICE" && msg.message.startsWith("Heard: ")) {
+              setLastVoiceHeard(msg.message.replace("Heard: ", ""));
+            }
           }
           break;
 

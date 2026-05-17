@@ -26,6 +26,7 @@ function App() {
   const setOrbState = useMetherStore((s) => s.setOrbState);
   const isDemo = useMetherStore((s) => s.isDemo);
   const setDemo = useMetherStore((s) => s.setDemo);
+  const voiceStatus = useMetherStore((s) => s.voiceStatus);
   const addLog = useMetherStore((s) => s.addLog);
   const addCommand = useMetherStore((s) => s.addCommand);
   const commandHistory = useMetherStore((s) => s.commandHistory);
@@ -33,6 +34,10 @@ function App() {
 
   /* ── Demo mode: auto-cycle orb states ── */
   useEffect(() => {
+    if (voiceStatus === "online") {
+      setDemo(false);
+      return;
+    }
     if (!isDemo) return;
 
     const sequence: OrbState[] = ["idle", "listening", "processing", "speaking"];
@@ -45,7 +50,7 @@ function App() {
     }, 4000);
 
     return () => clearInterval(id);
-  }, [isDemo, setOrbState]);
+  }, [isDemo, setOrbState, voiceStatus, setDemo]);
 
   /* ── Orb click → toggle listen ── */
   const handleOrbActivate = useCallback(() => {
@@ -82,7 +87,10 @@ function App() {
         </>
       }
     >
-      <VoiceOrb state={orbState} onActivate={handleOrbActivate} />
+      <VoiceOrb 
+        state={(voiceStatus === "offline" && !isDemo && orbState === "idle") ? "sleeping" : orbState} 
+        onActivate={handleOrbActivate} 
+      />
     </HUDLayout>
   );
 }

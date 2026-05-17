@@ -10,7 +10,7 @@ import { create } from "zustand";
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Types ── */
-export type OrbState = "idle" | "listening" | "processing" | "speaking";
+export type OrbState = "sleeping" | "idle" | "listening" | "processing" | "speaking";
 export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
 export interface LogEntry {
@@ -42,6 +42,12 @@ interface MetherState {
   setOrbState: (s: OrbState) => void;
   voiceStatus: "offline" | "online";
   setVoiceStatus: (s: "offline" | "online") => void;
+  lastVoiceHeard: string;
+  setLastVoiceHeard: (s: string) => void;
+  voiceLatency: number | null;
+  setVoiceLatency: (n: number | null) => void;
+  wakeWordTime: number | null;
+  setWakeWordTime: (n: number | null) => void;
 
   /* WebSocket */
   connectionStatus: ConnectionStatus;
@@ -115,6 +121,12 @@ export const useMetherStore = create<MetherState>((set) => ({
   setOrbState: (s) => set({ orbState: s }),
   voiceStatus: "offline",
   setVoiceStatus: (s) => set({ voiceStatus: s }),
+  lastVoiceHeard: "",
+  setLastVoiceHeard: (s) => set({ lastVoiceHeard: s }),
+  voiceLatency: null,
+  setVoiceLatency: (n) => set({ voiceLatency: n }),
+  wakeWordTime: null,
+  setWakeWordTime: (n) => set({ wakeWordTime: n }),
 
   /* WebSocket */
   connectionStatus: "disconnected",
