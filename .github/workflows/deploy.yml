@@ -1,0 +1,40 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        run: cd frontend && npm ci
+      - name: Build
+        run: cd frontend && npm run build
+        env:
+          VITE_BACKEND_URL: ${{ secrets.RENDER_BACKEND_URL }}
+          VITE_WS_URL: ${{ secrets.RENDER_WS_URL }}
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: frontend
+          vercel-args: "--prod"
+
+  notify-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render backend deploy
+        run: |
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
+      - name: Trigger Render proxy deploy
+        run: |
+          curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_PROXY }}
