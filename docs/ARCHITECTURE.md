@@ -9,6 +9,8 @@
 
 ## Executive Summary
 
+![METHER OS Tactical HUD Dashboard](assets/mether-demo.png)
+
 METHER OS is a **personal AI operating system** — a five-layer stack combining voice input, LLM reasoning, tool execution, multi-modal output, and cloud-free infrastructure.
 
 **Core principle:** Jarvis-level autonomy without the cloud. Every computation happens locally or through free APIs. Full WhatsApp automation. Hinglish voice support. Tactical HUD dashboard.
