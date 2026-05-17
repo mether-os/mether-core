@@ -41,6 +41,7 @@ const MODULE_COLORS: Record<string, string> = {
   SYSTEM: "text-on-surface-variant",
   CMD: "text-primary",
   METHER: "text-primary-fixed",
+  WA: "text-success",
 };
 
 /* ── Helpers ── */
