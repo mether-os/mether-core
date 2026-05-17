@@ -1,0 +1,19 @@
+name: WhatsApp Sidecar CI
+on:
+  push:
+    paths: ["whatsapp/**"]
+  pull_request:
+    paths: ["whatsapp/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        run: cd whatsapp && npm ci
+      - name: Lint
+        run: cd whatsapp && npm run lint || true

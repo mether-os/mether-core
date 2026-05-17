@@ -1,0 +1,30 @@
+name: Backend CI
+on:
+  push:
+    paths: ["backend/**"]
+  pull_request:
+    paths: ["backend/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -e ".[dev]"
+      - name: Lint (ruff)
+        run: cd backend && ruff check src/
+      - name: Type check (mypy)
+        run: cd backend && mypy src/mether/ --ignore-missing-imports
+      - name: Run tests
+        run: cd backend && pytest tests/ -v --tb=short
+        env:
+          LLM_PROXY_URL: http://localhost:8082
+          METHER_PORT: 8000
+          GOOGLE_CREDENTIALS_PATH: /tmp/fake_creds.json
+          GOOGLE_TOKEN_PATH: /tmp/fake_token.json
