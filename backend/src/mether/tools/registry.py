@@ -6,7 +6,7 @@ from typing import Any
 
 import structlog
 
-from mether.tools.base import BaseTool
+from mether.tools.base import BaseTool, SecurityLevel
 
 logger = structlog.get_logger(__name__)
 
@@ -28,6 +28,13 @@ class ToolRegistry:
     def get(self, name: str) -> BaseTool | None:
         """Return the tool with *name*, or ``None``."""
         return self._tools.get(name)
+
+    def get_safe(self, name: str, level: SecurityLevel) -> BaseTool | None:
+        """Only return tool if its security_level <= requested level."""
+        tool = self.get(name)
+        if tool and tool.security_level <= level:
+            return tool
+        return None
 
     def all_schemas(self) -> list[dict[str, Any]]:
         """Return Anthropic-format tool schemas for every registered tool."""

@@ -35,6 +35,18 @@ export interface WAPing {
   timestamp: number;
 }
 
+export interface ConfirmRequest {
+  action_id: string;
+  tool: string;
+  description: string;
+  params: any;
+}
+
+export interface TerminalLine {
+  id: number;
+  text: string;
+}
+
 /* ── Store interface ── */
 interface MetherState {
   /* Voice Orb & Pipeline */
@@ -97,6 +109,23 @@ interface MetherState {
   /* Global WebSocket Send */
   socketSend: ((msg: string) => void) | null;
   setSocketSend: (sendFn: ((msg: string) => void) | null) => void;
+
+  /* Confirm Flow */
+  pendingConfirmation: ConfirmRequest | null;
+  setPendingConfirmation: (req: ConfirmRequest | null) => void;
+
+  /* Terminal */
+  terminalLines: TerminalLine[];
+  terminalOpen: boolean;
+  terminalCommand: string | null;
+  terminalProcessExit: number | null;
+  terminalPinned: boolean;
+  addTerminalLine: (line: TerminalLine) => void;
+  clearTerminal: () => void;
+  setTerminalOpen: (open: boolean) => void;
+  setTerminalCommand: (cmd: string | null) => void;
+  setTerminalProcessExit: (code: number | null) => void;
+  setTerminalPinned: (pinned: boolean) => void;
 }
 
 /* ── Helpers ── */
@@ -213,4 +242,23 @@ export const useMetherStore = create<MetherState>((set) => ({
   /* WebSocket send */
   socketSend: null,
   setSocketSend: (sendFn) => set({ socketSend: sendFn }),
+
+  /* Confirm Flow */
+  pendingConfirmation: null,
+  setPendingConfirmation: (req) => set({ pendingConfirmation: req }),
+
+  /* Terminal */
+  terminalLines: [],
+  terminalOpen: false,
+  terminalCommand: null,
+  terminalProcessExit: null,
+  terminalPinned: false,
+  addTerminalLine: (line) => set((state) => ({ 
+    terminalLines: [...state.terminalLines, line].slice(-200) // Keep last 200 lines
+  })),
+  clearTerminal: () => set({ terminalLines: [], terminalProcessExit: null }),
+  setTerminalOpen: (open) => set({ terminalOpen: open }),
+  setTerminalCommand: (cmd) => set({ terminalCommand: cmd }),
+  setTerminalProcessExit: (code) => set({ terminalProcessExit: code }),
+  setTerminalPinned: (pinned) => set({ terminalPinned: pinned }),
 }));

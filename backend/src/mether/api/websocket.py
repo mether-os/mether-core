@@ -173,6 +173,11 @@ async def websocket_endpoint(
                 ping_id = data.get("ping_id")
                 await websocket.send_json({"type": "wa_ping_resolved", "ping_id": ping_id})
 
+            elif msg_type == "confirm_action":
+                action_id = data.get("action_id")
+                approved = data.get("approved", False)
+                await agent.confirm_action(action_id, approved)
+
             else:
                 await websocket.send_json(
                     {"type": "error", "text": f"Unknown message type: {msg_type}"}

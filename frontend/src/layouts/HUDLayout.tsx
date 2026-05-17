@@ -3,6 +3,8 @@ import { useClock } from "@/hooks/useClock";
 import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";
 import { WhatsAppPing } from "@/components/WhatsAppPing/WhatsAppPing";
+import { ConfirmDialog } from "@/components/ConfirmDialog/ConfirmDialog";
+import { TerminalFeed } from "@/components/TerminalFeed/TerminalFeed";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — HUD Layout Shell
@@ -278,6 +280,8 @@ export default function HUDLayout({
       <CenterViewport>{children}</CenterViewport>
 
       <WhatsAppPing />
+      <ConfirmDialog />
+      <TerminalFeed />
     </div>
   );
 }

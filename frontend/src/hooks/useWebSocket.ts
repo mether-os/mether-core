@@ -202,6 +202,38 @@ export function useWebSocket(): WebSocketHook {
           removePing(msg.ping_id);
           break;
 
+        case "confirm_required":
+          useMetherStore.getState().setPendingConfirmation({
+            action_id: msg.action_id,
+            tool: msg.tool,
+            description: msg.description,
+            params: msg.params
+          });
+          break;
+
+        case "action_cancelled":
+          const current = useMetherStore.getState().pendingConfirmation;
+          if (current?.action_id === msg.action_id) {
+            useMetherStore.getState().setPendingConfirmation(null);
+          }
+          break;
+
+        case "terminal_line":
+          if (msg.line !== undefined) {
+            const store = useMetherStore.getState();
+            if (!store.terminalOpen) {
+              store.clearTerminal();
+              store.setTerminalCommand(msg.command || "Executing...");
+              store.setTerminalOpen(true);
+            }
+            store.addTerminalLine({ id: Date.now() + Math.random(), text: msg.line });
+          }
+          break;
+
+        case "terminal_exit":
+          useMetherStore.getState().setTerminalProcessExit(msg.returncode);
+          break;
+
         default:
           addLog("WS", `Unknown message type: ${msg.type}`);
       }

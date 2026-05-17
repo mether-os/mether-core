@@ -21,6 +21,9 @@ from mether.memory.context import ContextMemory
 from mether.tools.registry import ToolRegistry
 from mether.tools.system import SystemTool
 from mether.tools.whatsapp import WhatsAppTool, HANDLED_CONTACTS
+from mether.tools.system_control import (
+    AppLaunchTool, CodeRunTool, FileSystemTool, ProcessTool, ClipboardTool, ScreenshotTool
+)
 import asyncio
 import time
 
@@ -118,6 +121,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tools = ToolRegistry()
     tools.register(SystemTool())
     tools.register(WhatsAppTool())
+    tools.register(AppLaunchTool())
+    tools.register(CodeRunTool(bus=bus))
+    tools.register(FileSystemTool())
+    tools.register(ProcessTool())
+    tools.register(ClipboardTool())
+    tools.register(ScreenshotTool())
 
     # 7. Init METHERAgent
     agent = METHERAgent(llm=llm, tools=tools, memory=memory, bus=bus)
