@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useMetherStore } from "@/stores/metherStore";
 import config from "../../config";
 
@@ -9,7 +9,7 @@ import config from "../../config";
 
 /* ── Constants ── */
 const SEGMENT_COUNT = 10;
-const RADAR_SIZE = 180;
+const RADAR_SIZE = 220;
 const RADAR_CENTER = RADAR_SIZE / 2;
 const SWEEP_DURATION = 3; // seconds per full rotation
 
@@ -210,10 +210,11 @@ function ProximityRadar() {
           </g>
 
           {/* ── Center dot ── */}
-          <circle
-            cx={RADAR_CENTER}
-            cy={RADAR_CENTER}
-            r="2.5"
+          <rect
+            x={RADAR_CENTER - 2.5}
+            y={RADAR_CENTER - 2.5}
+            width="5"
+            height="5"
             fill="#4cd7f6"
             filter="url(#blipGlow)"
           />
@@ -232,11 +233,12 @@ function ProximityRadar() {
             const brightness = angleDiff < 30 ? 1 : Math.max(0.15, 1 - angleDiff / 180);
 
             return (
-              <circle
+              <rect
                 key={blip.id}
-                cx={bx}
-                cy={by}
-                r="2.5"
+                x={bx - 2.5}
+                y={by - 2.5}
+                width="5"
+                height="5"
                 fill={`rgba(76, 215, 246, ${brightness})`}
                 filter={brightness > 0.5 ? "url(#blipGlow)" : undefined}
               />
@@ -455,7 +457,7 @@ function GoogleServices() {
 /* ═══════════════════════════════════════════════════════════════
    RIGHT PANEL — Main Export
    ═══════════════════════════════════════════════════════════════ */
-export default function RightPanel() {
+const RightPanel = () => {
   return (
     <div className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container overflow-y-auto" style={{ scrollbarWidth: "none" }}>
       {/* Extra corners (top-right + bottom-left) */}
@@ -484,3 +486,5 @@ export default function RightPanel() {
     </div>
   );
 }
+
+export default React.memo(RightPanel);

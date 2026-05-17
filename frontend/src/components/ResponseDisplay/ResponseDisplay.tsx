@@ -29,6 +29,7 @@ export default function ResponseDisplay() {
       setIsStreaming(true);
       setDisplayText("");
       setOrbState("speaking");
+      window.dispatchEvent(new Event("mether-orb-pulse"));
 
       const tick = () => {
         if (idx < words.length) {
@@ -90,8 +91,10 @@ export default function ResponseDisplay() {
     >
       <div className={`max-w-[800px] w-full flex items-start gap-3 px-5 py-4
                       bg-surface-container-lowest/95 border backdrop-blur-md shadow-2xl pointer-events-auto max-h-[60vh] overflow-y-auto rounded-sm ${isVoice ? 'border-purple-500/30' : 'border-primary/30'}`}>
-        <span className="text-data-mono shrink-0 font-bold tracking-wider pt-0.5" style={{ color: prefixColor }}>
-          {isVoice ? "🎤 METHER >" : "METHER >"}
+        <span className="text-data-mono shrink-0 font-bold tracking-wider pt-0.5 flex gap-1.5">
+          {isVoice && <span className="opacity-80">🎤</span>}
+          <span className="text-on-surface">METHER</span>
+          <span style={{ color: prefixColor }}>&gt;</span>
         </span>
         <span className="ai-response-text whitespace-pre-wrap leading-relaxed flex-1 text-sm font-mono tracking-wide" style={{ color: textColor }}>
           {displayText}

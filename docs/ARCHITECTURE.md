@@ -13,7 +13,7 @@
 
 METHER OS is a **personal AI operating system** — a five-layer stack combining voice input, LLM reasoning, tool execution, multi-modal output, and cloud-free infrastructure.
 
-**Core principle:** Jarvis-level autonomy without the cloud. Every computation happens locally or through free APIs. Full WhatsApp automation. Hinglish voice support. Tactical HUD dashboard.
+**Core principle:** METHER-level autonomy without the cloud. Every computation happens locally or through free APIs. Full WhatsApp automation. Hinglish voice support. Tactical HUD dashboard.
 
 ---
 
@@ -37,7 +37,7 @@ METHER OS is a **personal AI operating system** — a five-layer stack combining
 
 | Interface | Protocol | Use Case | Status |
 |-----------|----------|----------|--------|
-| **Voice** | openWakeWord + Whisper-Hinglish | Hands-free "Hey Jarvis" | v1 |
+| **Voice** | openWakeWord + Whisper-Hinglish | Hands-free "Hey Mether" | v1 |
 | **Web Dashboard** | WebSocket (React UI) | Type commands, see HUD | v1 |
 | **WhatsApp** | whatsapp-web.js (full control) | Read/send/manage groups | v1 |
 | **Telegram** | Bot API | Mobile remote access | v2 |
@@ -193,7 +193,7 @@ Response streamed back
 
 ```
 ┌──────────────┐
-│ VOICE INPUT  │ ── "Hey Jarvis, what's my calendar?"
+│ VOICE INPUT  │ ── "Hey Mether, what's my calendar?"
 │ openWakeWord │
 └──────┬───────┘
        ↓
@@ -347,7 +347,7 @@ class SendWhatsAppInput(BaseModel):
 - [ ] Start backend: `uvicorn mether.main:app`
 - [ ] Start frontend: `npm run dev`
 - [ ] Open http://localhost:5173 (Vite dev server)
-- [ ] Say "Hey Jarvis" into your mic
+- [ ] Say "Hey Mether" into your mic
 
 ---
 

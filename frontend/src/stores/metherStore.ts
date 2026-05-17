@@ -174,7 +174,10 @@ export const useMetherStore = create<MetherState>((set) => ({
         message,
       };
       const next = [...state.logs, entry];
-      return { logs: next.length > MAX_LOGS ? next.slice(-MAX_LOGS) : next };
+      if (next.length > MAX_LOGS) {
+        return { logs: next.slice(-(MAX_LOGS - 10)) };
+      }
+      return { logs: next };
     }),
   clearLogs: () => set({ logs: [] }),
 

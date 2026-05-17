@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from "react";
 import { Send, Mic } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -91,6 +91,18 @@ export default function CommandInput({
     [handleSubmit, commandHistory, historyIdx]
   );
 
+  /* ── Global Keyboard Shortcuts ── */
+  useEffect(() => {
+    const handleGlobalKey = (e: globalThis.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKey);
+    return () => window.removeEventListener("keydown", handleGlobalKey);
+  }, []);
+
   return (
     <div
       key={flashKey}
@@ -102,7 +114,7 @@ export default function CommandInput({
     >
       {/* ── Prompt prefix ── */}
       <span className="text-label-caps text-primary text-glow-cyan tracking-[0.12em] shrink-0 text-[11px]">
-        &gt; JARVIS://
+        &gt; METHER://
       </span>
 
       {/* ── Connection indicator dot ── */}
@@ -126,17 +138,17 @@ export default function CommandInput({
           onKeyDown={handleKey}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          placeholder="ENTER COMMAND..."
+          placeholder="ENTER DIRECTIVE..."
           spellCheck={false}
           autoComplete="off"
-          className="w-full bg-transparent font-mono text-sm text-primary
+          className={`w-full bg-transparent font-mono text-sm text-primary
                      placeholder:text-outline-variant/50 placeholder:tracking-[0.15em]
                      border-none outline-none tracking-wider
                      border-b border-b-primary/20 pb-0.5
-                     caret-transparent"
+                     caret-transparent transition-all duration-200
+                     ${isFocused ? "shadow-[0_4px_12px_rgba(76,215,246,0.1)]" : ""}`}
           style={{
-            borderBottom: `1px solid rgba(76, 215, 246, ${isFocused ? 0.5 : 0.15})`,
-            transition: "border-color 0.2s ease",
+            borderBottom: `1px solid rgba(76, 215, 246, ${isFocused ? 0.6 : 0.2})`,
           }}
         />
 
@@ -151,6 +163,11 @@ export default function CommandInput({
           />
         )}
       </div>
+
+      {/* ── Hint ── */}
+      <span className="hidden md:inline text-[9px] font-mono text-outline-variant/40 shrink-0 pointer-events-none pr-1">
+        CTRL+K
+      </span>
 
       {/* ── Mic button ── */}
       <button
@@ -168,8 +185,8 @@ export default function CommandInput({
         disabled={!value.trim()}
         className="hud-button !py-1.5 !px-3 !text-[9px]"
       >
-        <span>SEND</span>
-        <Send size={12} />
+        <span className="hidden md:inline">EXECUTE</span>
+        <Send size={12} className="md:ml-1" />
       </button>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";
 
@@ -164,7 +164,7 @@ function SystemVitals() {
    AGENT LOG — Bottom 70%
    Reads from global store + generates demo entries.
    ═══════════════════════════════════════════════════════════════ */
-function AgentLog() {
+export function AgentLog() {
   const storeLogs = useMetherStore((s) => s.logs);
   const addLog = useMetherStore((s) => s.addLog);
   const isDemo = useMetherStore((s) => s.isDemo);
@@ -234,8 +234,9 @@ function LogLine({ entry }: { entry: { id: number; time: string; module: string;
   return (
     <div
       className="text-[9px] font-mono leading-[1.7] whitespace-nowrap
-                 overflow-hidden animate-type-in log-entry-hover
+                 overflow-hidden text-ellipsis animate-type-in log-entry-hover
                  px-1 -mx-1 rounded-sm"
+      title={`[${entry.time}] [${entry.module}] ${entry.message}`}
     >
       <span className="text-outline-variant">[{entry.time}]</span>{" "}
       <span className={`${moduleColor} font-bold`}>[{entry.module}]</span>{" "}
@@ -263,7 +264,7 @@ function ConversationSummaryCard({ summary, onDismiss }: { summary: Record<strin
 /* ═══════════════════════════════════════════════════════════════
    LEFT PANEL — Main Export
    ═══════════════════════════════════════════════════════════════ */
-export default function LeftPanel() {
+const LeftPanel = () => {
   const summaries = useMetherStore(s => s.summaries);
   const dismissSummary = useMetherStore(s => s.dismissSummary);
 
@@ -283,3 +284,5 @@ export default function LeftPanel() {
     </div>
   );
 }
+
+export default React.memo(LeftPanel);

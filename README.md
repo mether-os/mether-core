@@ -1,5 +1,15 @@
 <div align="center">
 
+<img 
+  src="docs/assets/mether-logo.png" 
+  alt="METHER OS" 
+  width="400"
+  style="background: #050810; padding: 16px; border-radius: 8px;"
+/>
+
+<br/>
+<br/>
+
 ```
 ███╗   ███╗███████╗████████╗██╗  ██╗███████╗██████╗      ██████╗ ███████╗
 ████╗ ████║██╔════╝╚══██╔══╝██║  ██║██╔════╝██╔══██╗    ██╔═══██╗██╔════╝
@@ -61,7 +71,7 @@ Built with a tactical sci-fi HUD that makes you feel like Tony Stark. Because wh
 
 **🎙️ Voice Pipeline**
 ```
-"Hey Jarvis" → wake word detected
+"Hey Mether" → wake word detected
 → Whisper STT (Hinglish support)
 → Agent processes
 → Piper TTS responds
@@ -125,7 +135,7 @@ Built with a tactical sci-fi HUD that makes you feel like Tony Stark. Because wh
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │  INPUT LAYER                                                         │
-│  Voice "Hey Jarvis" │ Web Dashboard │ WhatsApp │ Telegram           │
+│  Voice "Hey Mether" │ Web Dashboard │ WhatsApp │ Telegram           │
 └──────────────────────────────┬──────────────────────────────────────┘
                                │
 ┌──────────────────────────────▼──────────────────────────────────────┐

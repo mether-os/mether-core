@@ -48,7 +48,7 @@ async def main():
     print("[METHER-VOICE] ✓ Audio I/O ready")
 
     # ── Wake word ─────────────────────────────────────────────
-    wake_word = os.getenv("WAKE_WORD", "hey jarvis")
+    wake_word = os.getenv("WAKE_WORD", "hey mether")
     wake = WakeWordDetector(wake_word)
     print(f"[METHER-VOICE] ✓ Wake word detector loaded  ({wake_word})")
 

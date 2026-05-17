@@ -5,9 +5,9 @@ from openwakeword.model import Model
 
 
 class WakeWordDetector:
-    """Detects a wake phrase (e.g. 'hey jarvis') in streaming audio."""
+    """Detects a wake phrase (e.g. 'hey mether') in streaming audio."""
 
-    def __init__(self, wake_word: str = "hey_jarvis"):
+    def __init__(self, wake_word: str = "hey_mether"):
         # openWakeWord uses underscore-separated, lowercase model names
         self.wake_word = wake_word.replace(" ", "_").lower()
         self.model = Model(

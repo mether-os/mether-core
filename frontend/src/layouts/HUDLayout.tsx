@@ -44,12 +44,10 @@ function TopBar() {
   /* Derive chip configs from connection status */
   const onlineChip =
     connectionStatus === "connected"
-      ? { label: "ONLINE", cls: "hud-chip hud-chip--success" }
+      ? { label: "● ONLINE", cls: "hud-chip hud-chip--success" }
       : connectionStatus === "connecting"
-        ? { label: "CONNECTING", cls: "hud-chip hud-chip--warning" }
-        : connectionStatus === "error"
-          ? { label: "ERROR", cls: "hud-chip hud-chip--error" }
-          : { label: "OFFLINE", cls: "hud-chip hud-chip--error" };
+        ? { label: "○ CONNECTING", cls: "hud-chip !border-amber-500/50 !text-amber-400 !bg-amber-500/10 shadow-[0_0_10px_rgba(245,158,11,0.2)] motion-safe:animate-pulse" }
+        : { label: "● OFFLINE", cls: "hud-chip !border-rose-500/50 !text-rose-400 !bg-rose-500/10" };
 
   return (
     <header
@@ -60,9 +58,17 @@ function TopBar() {
     >
       {/* ── Left: System ID + status dots ── */}
       <div className="flex items-center gap-3">
-        <span className="text-data-mono text-primary tracking-[0.15em] font-bold">
-          METHER OS v1.0
-        </span>
+        <div style={{ mixBlendMode: "screen" }} className="flex items-center h-[28px]">
+          <img src="/logo.png" height={28} className="h-[28px] w-auto" alt="Logo" />
+        </div>
+        <div className="flex flex-col">
+          <span className="font-space font-bold text-primary tracking-[0.08em] leading-tight">
+            METHER OS
+          </span>
+          <span className="text-[10px] text-data-mono opacity-50 leading-tight">
+            v1.0.0
+          </span>
+        </div>
         <div className="flex items-center gap-1.5 ml-1">
           <StatusDot color="bg-success" delay="0s" />
           <StatusDot color="bg-primary" delay="0.5s" />
@@ -79,7 +85,7 @@ function TopBar() {
       </div>
 
       {/* ── Right: Status chips (reactive to connection) ── */}
-      <div className="flex items-center gap-2">
+      <div className="hidden md:flex items-center gap-2">
         <span className={onlineChip.cls}>{onlineChip.label}</span>
         {voiceStatus === "online" ? (
           <span className="hud-chip !border-[#c084fc]/50 !text-[#f3e8ff] !bg-[#c084fc]/10 shadow-[0_0_10px_rgba(192,132,252,0.2)]">
@@ -112,25 +118,31 @@ function BottomBar() {
       style={{ height: BOTTOM_BAR_H }}
     >
       {/* ── Left: Active tool name (from store) ── */}
-      <div className="flex items-center gap-2 min-w-[180px]">
+      <div className="hidden md:flex items-center gap-2 min-w-[180px]">
         <span className="text-data-mono text-outline tracking-[0.08em]">&gt; TOOL:</span>
         <span className="text-data-mono text-on-surface-variant tracking-wider">
-          {activeTool}
+          {activeTool.toUpperCase()}
         </span>
       </div>
 
       {/* ── Center: Tagline ── */}
-      <div className="absolute left-1/2 -translate-x-1/2">
-        <span className="text-data-mono text-outline-variant tracking-[0.12em]">
+      <div className="absolute left-1/2 -translate-x-1/2 w-full text-center">
+        <span className="text-data-mono text-outline-variant tracking-[0.12em] md:hidden">
+          METHER OS
+        </span>
+        <span className="text-data-mono text-outline-variant tracking-[0.12em] hidden md:inline">
           METHER INTELLIGENCE OS // TACTICAL INTERFACE
         </span>
       </div>
 
       {/* ── Right: Uptime ── */}
-      <div className="flex items-center gap-2 min-w-[180px] justify-end">
-        <span className="text-data-mono text-outline tracking-[0.08em]">UPTIME</span>
+      <div className="hidden md:flex items-center gap-2 min-w-[180px] justify-end">
+        <span className="text-data-mono text-outline tracking-[0.08em]">UPTIME:</span>
         <span className="text-data-mono text-primary font-bold tracking-[0.15em]">
-          {uptime}
+          {uptime} // IST
+        </span>
+        <span className="text-data-mono text-[10px] tracking-widest opacity-30 ml-4 hidden md:inline">
+          OPEN SOURCE // MIT
         </span>
       </div>
     </footer>
@@ -146,7 +158,7 @@ function SidePanel({ side, children }: { side: "left" | "right"; children?: Reac
   return (
     <aside
       id={`hud-panel-${side}`}
-      className={`fixed ${posClass} z-40 overflow-y-auto overflow-x-hidden`}
+      className={`fixed ${posClass} z-40 overflow-y-auto overflow-x-hidden hidden md:block`}
       style={{
         top: TOP_BAR_H,
         bottom: BOTTOM_TOTAL,
@@ -204,12 +216,10 @@ function CenterViewport({ children }: { children?: ReactNode }) {
   return (
     <main
       id="hud-center-viewport"
-      className="fixed z-30 flex items-center justify-center overflow-hidden"
+      className="fixed z-30 flex items-center justify-center overflow-hidden left-0 right-0 md:left-[260px] md:right-[260px]"
       style={{
         top: TOP_BAR_H,
         bottom: BOTTOM_TOTAL,
-        left: SIDE_PANEL_W,
-        right: SIDE_PANEL_W,
       }}
     >
       {/* Tactical grid background */}

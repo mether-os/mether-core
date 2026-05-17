@@ -595,7 +595,8 @@ body {
     rgba(76, 215, 246, 0.15) 70%,
     transparent 100%
   );
-  animation: scan 6s linear infinite;
+  animation: scan 8s linear infinite;
+  opacity: 0.03;
   pointer-events: none;
   z-index: 9999;
 }

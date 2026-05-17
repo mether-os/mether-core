@@ -1,5 +1,5 @@
 import { motion, type Variants } from "framer-motion";
-import { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Voice Orb
@@ -90,12 +90,12 @@ const STATE_CONFIG = {
 const SPRING = { type: "spring" as const, stiffness: 120, damping: 18 };
 
 /* ── Size constants ── */
-const ORB_SIZE = 280;
-const CORE_SIZE = 56;
-const GLOW_RING_SIZE = 100;
-const RING_3_SIZE = 150;
-const RING_2_SIZE = 200;
-const RING_1_SIZE = 260;
+const ORB_SIZE = 360;
+const CORE_SIZE = 72;
+const GLOW_RING_SIZE = 130;
+const RING_3_SIZE = 190;
+const RING_2_SIZE = 250;
+const RING_1_SIZE = 330;
 
 /* ═══════════════════════════════════════════════════════════════
    SUB-COMPONENTS
@@ -110,9 +110,11 @@ function OuterRing({ speed }: { speed: number }) {
         width: RING_1_SIZE,
         height: RING_1_SIZE,
         border: "1px dashed rgba(76, 215, 246, 0.3)",
+        willChange: "transform",
       }}
       animate={{ rotate: 360 }}
       transition={{ duration: 20 / speed, repeat: Infinity, ease: "linear" }}
+      layout={false}
     />
   );
 }
@@ -127,9 +129,11 @@ function MiddleRing({ speed }: { speed: number }) {
         height: RING_2_SIZE,
         border: "1.5px dashed rgba(76, 215, 246, 0.5)",
         strokeDasharray: "12 8",
+        willChange: "transform",
       }}
       animate={{ rotate: -360 }}
       transition={{ duration: 14 / speed, repeat: Infinity, ease: "linear" }}
+      layout={false}
     />
   );
 }
@@ -203,6 +207,7 @@ function GlowRing({
         repeat: Infinity,
         ease: "easeInOut",
       }}
+      layout={false}
     />
   );
 }
@@ -356,14 +361,25 @@ function StateLabel({ label, isProcessing }: { label: string; isProcessing?: boo
    VOICE ORB — Main Export
    ═══════════════════════════════════════════════════════════════ */
 
-export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
+const VoiceOrb = ({ state, onActivate }: VoiceOrbProps) => {
   const cfg = STATE_CONFIG[state];
   const [pulseKey, setPulseKey] = useState(0);
+  const [isPulsing, setIsPulsing] = useState(false);
 
   const handleClick = useCallback(() => {
     setPulseKey((k) => k + 1);
     onActivate?.();
   }, [onActivate]);
+
+  useEffect(() => {
+    const onPulse = () => {
+      setPulseKey((k) => k + 1);
+      setIsPulsing(true);
+      setTimeout(() => setIsPulsing(false), 500);
+    };
+    window.addEventListener("mether-orb-pulse", onPulse);
+    return () => window.removeEventListener("mether-orb-pulse", onPulse);
+  }, []);
 
   return (
     <motion.div
@@ -373,8 +389,8 @@ export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.95 }}
       initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={SPRING}
+      animate={{ opacity: 1, scale: isPulsing ? [1, 1.05, 1] : 1 }}
+      transition={isPulsing ? { duration: 0.5, ease: "easeInOut" } : SPRING}
     >
       {/* ── Click pulse ring ── */}
       <div
@@ -389,10 +405,10 @@ export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
       <motion.div
         className="absolute rounded-full pointer-events-none"
         style={{
-          width: ORB_SIZE * 1.2,
-          height: ORB_SIZE * 1.2,
+          width: ORB_SIZE * 1.5,
+          height: ORB_SIZE * 1.5,
           background:
-            "radial-gradient(circle, rgba(76, 215, 246, 0.06) 0%, transparent 70%)",
+            "radial-gradient(ellipse 50% 45% at 50% 50%, rgba(76, 215, 246, 0.06) 0%, transparent 70%)",
         }}
         animate={{
           opacity: [cfg.glowOpacity * 0.5, cfg.glowOpacity, cfg.glowOpacity * 0.5],
@@ -449,4 +465,6 @@ export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
     </motion.div>
   );
 }
+
+export default React.memo(VoiceOrb);
 
