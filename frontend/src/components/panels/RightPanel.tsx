@@ -431,9 +431,9 @@ function GoogleServices() {
       <span className={`text-data-mono text-[9px] ${active ? "text-primary" : "text-outline-variant"}`}>
         [{active ? "● ACTIVE" : "○ OFFLINE"}]
       </span>
-      {name === "GMAIL" && status.email && (
+      {name === "GMAIL" && typeof status.email === "string" && (
         <span className="text-[9px] text-on-surface-variant max-w-[80px] truncate ml-2">
-          {status.email}
+          {status.email as string}
         </span>
       )}
     </div>

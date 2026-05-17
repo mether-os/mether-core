@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useClock } from "@/hooks/useClock";
 import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";

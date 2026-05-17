@@ -10,7 +10,7 @@ import { useState, useCallback } from "react";
    Click: triggers a pulse ring effect.
    ═══════════════════════════════════════════════════════════════ */
 
-export type OrbState = "idle" | "listening" | "processing" | "speaking";
+export type OrbState = "sleeping" | "idle" | "listening" | "processing" | "speaking";
 
 export interface VoiceOrbProps {
   state: OrbState;

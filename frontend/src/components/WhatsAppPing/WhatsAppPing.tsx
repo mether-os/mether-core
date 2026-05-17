@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useMetherStore } from "@/stores/metherStore";
 import type { WAPing } from "@/stores/metherStore";

@@ -70,14 +70,16 @@ export function useWebSocket(): WebSocketHook {
             }
           }
           break;
-        case "log":
-          if (msg.module && msg.message) {
-            addLog(msg.module, msg.message);
-            if (msg.module === "VOICE" && msg.message.startsWith("Heard: ")) {
-              setLastVoiceHeard(msg.message.replace("Heard: ", ""));
+        case "log": {
+          const payload = msg as any;
+          if (payload.module && payload.message) {
+            addLog(payload.module, payload.message);
+            if (payload.module === "VOICE" && payload.message.startsWith("Heard: ")) {
+              setLastVoiceHeard(payload.message.replace("Heard: ", ""));
             }
           }
           break;
+        }
         case "response":
           if (typeof msg.text === "string") {
             setActiveResponse(msg.source === "voice" ? `[VOICE] ${msg.text}` : msg.text);
@@ -90,18 +92,22 @@ export function useWebSocket(): WebSocketHook {
           break;
         case "agent.thinking":
           break;
-        case "tool.start":
-          if (msg.data && msg.data.tool) {
-            setActiveTool(msg.data.tool);
-            addLog("TOOL", `Active: ${msg.data.tool}`);
+        case "tool.start": {
+          const payload = msg as any;
+          if (payload.data && payload.data.tool) {
+            setActiveTool(payload.data.tool);
+            addLog("TOOL", `Active: ${payload.data.tool}`);
           }
           break;
-        case "tool.done":
-          if (msg.data && msg.data.tool) {
-            addLog("TOOL", `Done: ${msg.data.tool}`);
+        }
+        case "tool.done": {
+          const payload = msg as any;
+          if (payload.data && payload.data.tool) {
+            addLog("TOOL", `Done: ${payload.data.tool}`);
             setActiveTool("STANDBY");
           }
           break;
+        }
         case "tool_active":
           if (typeof msg.data === "string") {
             setActiveTool(msg.data);
@@ -128,47 +134,58 @@ export function useWebSocket(): WebSocketHook {
         case "conversation_summary":
           addSummary(msg);
           break;
-        case "wa_ping":
+        case "wa_ping": {
+          const payload = msg as any;
           addPing({
-            ping_id: msg.ping_id,
-            contact_id: msg.contact_id,
-            contact_name: msg.contact_name,
-            preview: msg.preview,
-            timestamp: msg.timestamp,
+            ping_id: payload.ping_id,
+            contact_id: payload.contact_id,
+            contact_name: payload.contact_name,
+            preview: payload.preview,
+            timestamp: payload.timestamp,
           });
           break;
-        case "wa_ping_resolved":
-          removePing(msg.ping_id);
+        }
+        case "wa_ping_resolved": {
+          const payload = msg as any;
+          removePing(payload.ping_id);
           break;
-        case "confirm_required":
+        }
+        case "confirm_required": {
+          const payload = msg as any;
           useMetherStore.getState().setPendingConfirmation({
-            action_id: msg.action_id,
-            tool: msg.tool,
-            description: msg.description,
-            params: msg.params
+            action_id: payload.action_id,
+            tool: payload.tool,
+            description: payload.description,
+            params: payload.params
           });
           break;
+        }
         case "action_cancelled": {
+          const payload = msg as any;
           const current = useMetherStore.getState().pendingConfirmation;
-          if (current?.action_id === msg.action_id) {
+          if (current?.action_id === payload.action_id) {
             useMetherStore.getState().setPendingConfirmation(null);
           }
           break;
         }
-        case "terminal_line":
-          if (msg.line !== undefined) {
+        case "terminal_line": {
+          const payload = msg as any;
+          if (payload.line !== undefined) {
             const store = useMetherStore.getState();
             if (!store.terminalOpen) {
               store.clearTerminal();
-              store.setTerminalCommand(msg.command || "Executing...");
+              store.setTerminalCommand(payload.command || "Executing...");
               store.setTerminalOpen(true);
             }
-            store.addTerminalLine({ id: Date.now() + Math.random(), text: msg.line });
+            store.addTerminalLine({ id: Date.now() + Math.random(), text: payload.line });
           }
           break;
-        case "terminal_exit":
-          useMetherStore.getState().setTerminalProcessExit(msg.returncode);
+        }
+        case "terminal_exit": {
+          const payload = msg as any;
+          useMetherStore.getState().setTerminalProcessExit(payload.returncode);
           break;
+        }
         default:
           addLog("WS", `Unknown message type: ${msg.type}`);
       }
