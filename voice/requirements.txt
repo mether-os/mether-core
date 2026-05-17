@@ -1,4 +1,30 @@
+# METHER OS — Voice Pipeline Dependencies
+#
+# Install with: pip install -r requirements.txt
+#
+# ═══════════════════════════════════════════════════════════════
+# PIPER TTS — Install separately (not a pip package on Windows):
+#
+#   Windows:
+#     1. Download piper.exe from:
+#        https://github.com/rhasspy/piper/releases
+#     2. Place piper.exe in voice/bin/piper.exe
+#     3. Download voice model:
+#        https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx
+#     4. Download config:
+#        https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
+#     5. Place both files in voice/models/
+#
+#   Linux:
+#     pip install piper-tts
+# ═══════════════════════════════════════════════════════════════
+
 faster-whisper==1.0.3
-pipiper-tts==0.2.2
-openwakeword==0.5.1
+openwakeword==0.6.0
 sounddevice==0.4.6
+numpy==1.26.4
+httpx==0.27.0
+websockets==12.0
+scipy==1.13.0
+python-dotenv==1.0.0
+pyaudio==0.2.14
