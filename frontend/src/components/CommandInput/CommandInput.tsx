@@ -9,6 +9,7 @@ import { Send, Mic } from "lucide-react";
    • Escape → clear input
    • Up arrow → cycle command history
    • Blinking block cursor on focus
+   • Flash animation on submit
    ═══════════════════════════════════════════════════════════════ */
 
 interface CommandInputProps {
@@ -25,6 +26,7 @@ export default function CommandInput({
   const [value, setValue] = useState("");
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [isFocused, setIsFocused] = useState(false);
+  const [flashKey, setFlashKey] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   /* ── Submit ── */
@@ -35,6 +37,7 @@ export default function CommandInput({
     onSubmit(trimmed);
     setValue("");
     setHistoryIdx(-1);
+    setFlashKey((k) => k + 1); // trigger flash animation
   }, [value, onSubmit]);
 
   /* ── Keyboard ── */
@@ -82,9 +85,11 @@ export default function CommandInput({
 
   return (
     <div
+      key={flashKey}
       id="hud-command-bar"
-      className="fixed left-0 right-0 z-50 flex items-center gap-3 px-4
-                 bg-surface-container-low border-t border-primary/15 select-none"
+      className={`fixed left-0 right-0 z-50 flex items-center gap-3 px-4
+                 bg-surface-container-low border-t border-primary/15 select-none
+                 ${flashKey > 0 ? "cmd-flash" : ""}`}
       style={{ bottom: 32, height: 48 }}
     >
       {/* ── Prompt prefix ── */}

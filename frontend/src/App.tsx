@@ -2,6 +2,7 @@ import { useEffect, useCallback } from "react";
 import HUDLayout from "@/layouts/HUDLayout";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { CommandInput } from "@/components/CommandInput";
+import { AIResponseStreamer } from "@/components/AIResponseStreamer";
 import LeftPanel from "@/components/panels/LeftPanel";
 import RightPanel from "@/components/panels/RightPanel";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -15,6 +16,7 @@ import type { OrbState } from "@/stores/metherStore";
  * • HUDLayout (top/bottom bars, side panels, center viewport)
  * • VoiceOrb (reads orbState from store)
  * • CommandInput → WebSocket → Agent Log
+ * • AIResponseStreamer (demo mode typewriter AI responses)
  * • Demo mode auto-cycling for orb states
  */
 function App() {
@@ -69,11 +71,14 @@ function App() {
       leftPanel={<LeftPanel />}
       rightPanel={<RightPanel />}
       commandBar={
-        <CommandInput
-          onSubmit={handleCommand}
-          commandHistory={commandHistory}
-          isConnected={isConnected}
-        />
+        <>
+          <AIResponseStreamer />
+          <CommandInput
+            onSubmit={handleCommand}
+            commandHistory={commandHistory}
+            isConnected={isConnected}
+          />
+        </>
       }
     >
       <VoiceOrb state={orbState} onActivate={handleOrbActivate} />

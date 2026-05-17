@@ -252,6 +252,8 @@ export default function HUDLayout({
 }: HUDLayoutProps) {
   return (
     <div id="hud-layout" className="min-h-screen bg-void scan-line-overlay noise-overlay">
+      {/* ── Full-screen vignette ── */}
+      <div className="vignette-overlay" />
       {/* ── Edge bars ── */}
       <TopBar />
       <BottomBar />

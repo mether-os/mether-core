@@ -40,6 +40,7 @@ const MODULE_COLORS: Record<string, string> = {
   LLM: "text-primary-fixed-dim",
   SYSTEM: "text-on-surface-variant",
   CMD: "text-primary",
+  METHER: "text-primary-fixed",
 };
 
 /* ── Helpers ── */
@@ -230,7 +231,8 @@ function LogLine({ entry }: { entry: { id: number; time: string; module: string;
   return (
     <div
       className="text-[9px] font-mono leading-[1.7] whitespace-nowrap
-                 overflow-hidden animate-type-in"
+                 overflow-hidden animate-type-in log-entry-hover
+                 px-1 -mx-1 rounded-sm"
     >
       <span className="text-outline-variant">[{entry.time}]</span>{" "}
       <span className={`${moduleColor} font-bold`}>[{entry.module}]</span>{" "}

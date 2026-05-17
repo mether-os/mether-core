@@ -1,5 +1,5 @@
 import { motion, type Variants } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Voice Orb
@@ -7,6 +7,7 @@ import { useMemo } from "react";
 
    4 states: idle · listening · processing · speaking
    6 concentric layers rendered inside-out via absolute positioning.
+   Click: triggers a pulse ring effect.
    ═══════════════════════════════════════════════════════════════ */
 
 export type OrbState = "idle" | "listening" | "processing" | "speaking";
@@ -314,18 +315,33 @@ function StateLabel({ label }: { label: string }) {
 
 export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
   const cfg = STATE_CONFIG[state];
+  const [pulseKey, setPulseKey] = useState(0);
+
+  const handleClick = useCallback(() => {
+    setPulseKey((k) => k + 1);
+    onActivate?.();
+  }, [onActivate]);
 
   return (
     <motion.div
       className="relative flex items-center justify-center cursor-pointer select-none"
       style={{ width: ORB_SIZE, height: ORB_SIZE }}
-      onClick={onActivate}
+      onClick={handleClick}
       whileHover={{ scale: 1.03 }}
-      whileTap={{ scale: 0.97 }}
+      whileTap={{ scale: 0.95 }}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={SPRING}
     >
+      {/* ── Click pulse ring ── */}
+      <div
+        key={pulseKey}
+        className={`absolute rounded-full pointer-events-none ${
+          pulseKey > 0 ? "orb-click-pulse" : ""
+        }`}
+        style={{ width: CORE_SIZE, height: CORE_SIZE }}
+      />
+
       {/* ── Ambient background glow ── */}
       <motion.div
         className="absolute rounded-full pointer-events-none"
@@ -374,3 +390,4 @@ export default function VoiceOrb({ state, onActivate }: VoiceOrbProps) {
     </motion.div>
   );
 }
+
