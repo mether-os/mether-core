@@ -177,4 +177,4 @@ class METHERAgent:
         else:
             tools_section = ""
 
-        return persona + tools_section
+        return persona + tools_section + "\n\nFor WhatsApp: when user asks to send a message to a name (e.g. 'send mohit a message'), do NOT use the resolve tool. Simply call the 'send' action with 'to' set to the person's name directly. The backend will instantly auto-resolve it. Only call 'send' once."

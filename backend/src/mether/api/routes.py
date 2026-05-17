@@ -49,21 +49,21 @@ async def whatsapp_event(request: Request):
     
     if event == "whatsapp.message":
         # Forward message to the frontend and log
-        await bus.publish("whatsapp.message", data)
-        await bus.publish("ws.send", {"type": "log", "data": {"module": "WA", "message": f"Message from {data.get('fromName')}: {data.get('body', '')[:50]}"}})
+        await bus.emit("whatsapp.message", data)
+        await bus.emit("ws.send", {"type": "log", "module": "WA", "message": f"Message from {data.get('fromName')}: {data.get('body', '')[:50]}"})
     
     elif event == "whatsapp.ready":
         logger.info("whatsapp.ready", status="connected")
-        await bus.publish("ws.send", {"type": "log", "data": {"module": "WA", "message": "WhatsApp connected"}})
+        await bus.emit("ws.send", {"type": "log", "module": "WA", "message": "WhatsApp connected"})
         
     elif event == "whatsapp.qr":
         # Can be emitted to frontend to display the QR code
-        await bus.publish("whatsapp.qr", data)
-        await bus.publish("ws.send", {"type": "log", "data": {"module": "WA", "message": "New QR code generated"}})
+        await bus.emit("whatsapp.qr", data)
+        await bus.emit("ws.send", {"type": "log", "module": "WA", "message": "New QR code generated"})
         
     elif event == "whatsapp.disconnected":
         logger.warning("whatsapp.disconnected", reason=data.get("reason"))
-        await bus.publish("ws.send", {"type": "log", "data": {"module": "WA", "message": f"Disconnected: {data.get('reason')}"}})
+        await bus.emit("ws.send", {"type": "log", "module": "WA", "message": f"Disconnected: {data.get('reason')}"})
 
     return {"success": True}
 

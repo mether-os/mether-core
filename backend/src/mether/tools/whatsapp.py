@@ -11,6 +11,7 @@ class WhatsAppTool(BaseTool):
     - send: send a message. params: to (phone or name), message (text)
     - chats: get recent chats list
     - messages: get messages from a chat. params: chat_id
+    - resolve: resolve a contact name to their phone ID. params: query (name)
     
     Use 'send' to reply to someone on behalf of user.
     Always confirm with user before sending.
@@ -24,7 +25,7 @@ class WhatsAppTool(BaseTool):
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["send", "chats", "messages"],
+                    "enum": ["send", "chats", "messages", "resolve"],
                     "description": "The action to perform."
                 },
                 "to": {
@@ -38,25 +39,46 @@ class WhatsAppTool(BaseTool):
                 "chat_id": {
                     "type": "string",
                     "description": "The ID of the chat (for 'messages' action)."
+                },
+                "query": {
+                    "type": "string",
+                    "description": "The contact name to search for (for 'resolve' action)."
                 }
             },
             "required": ["action"]
         }
         
-    async def execute(self, action: str, **kwargs) -> ToolResult:
+    async def execute(self, action: str = "send", **kwargs) -> ToolResult:
         base = "http://localhost:3001"
         
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             try:
                 if action == "send":
                     if "to" not in kwargs or "message" not in kwargs:
                         return ToolResult(success=False, error="Missing 'to' or 'message' parameters.")
+                    
+                    to_param = kwargs["to"]
+                    resolved_name = None
+                    
+                    # If 'to' looks like a name (not just digits and @), try to resolve it first
+                    if not "@" in to_param and not to_param.replace("+", "").isdigit():
+                        res_resp = await client.post(f"{base}/resolve", json={"query": to_param})
+                        if res_resp.status_code == 200:
+                            resolved = res_resp.json()
+                            to_param = resolved["id"]
+                            resolved_name = resolved["name"]
+                    
                     resp = await client.post(f"{base}/send", json={
-                        "to": kwargs["to"],
+                        "to": to_param,
                         "message": kwargs["message"]
                     })
                     resp.raise_for_status()
-                    return ToolResult(success=True, data=resp.json())
+                    result_data = resp.json()
+                    if resolved_name:
+                        result_data["resolved_name"] = resolved_name
+                        result_data["resolved_number"] = to_param
+                        
+                    return ToolResult(success=True, data=result_data)
                 
                 elif action == "chats":
                     resp = await client.get(f"{base}/chats")
@@ -67,6 +89,13 @@ class WhatsAppTool(BaseTool):
                     if "chat_id" not in kwargs:
                         return ToolResult(success=False, error="Missing 'chat_id' parameter.")
                     resp = await client.get(f"{base}/messages/{kwargs['chat_id']}")
+                    resp.raise_for_status()
+                    return ToolResult(success=True, data=resp.json())
+                    
+                elif action == "resolve":
+                    if "query" not in kwargs:
+                        return ToolResult(success=False, error="Missing 'query' parameter.")
+                    resp = await client.post(f"{base}/resolve", json={"query": kwargs["query"]})
                     resp.raise_for_status()
                     return ToolResult(success=True, data=resp.json())
                 
