@@ -64,6 +64,11 @@ interface MetherState {
   /* Response Display */
   activeResponse: string | null;
   setActiveResponse: (res: string | null) => void;
+
+  /* WhatsApp Summaries */
+  summaries: any[];
+  addSummary: (summary: any) => void;
+  dismissSummary: (index: number) => void;
 }
 
 /* ── Helpers ── */
@@ -141,4 +146,11 @@ export const useMetherStore = create<MetherState>((set) => ({
   /* Response Display */
   activeResponse: null,
   setActiveResponse: (res) => set({ activeResponse: res }),
+
+  /* WhatsApp Summaries */
+  summaries: [],
+  addSummary: (summary) => set((state) => ({ summaries: [...state.summaries, summary] })),
+  dismissSummary: (index) => set((state) => ({
+    summaries: state.summaries.filter((_, i) => i !== index)
+  })),
 }));

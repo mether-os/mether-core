@@ -28,6 +28,7 @@ export function useWebSocket(): WebSocketHook {
     incrementStat,
     setActiveTool,
     setActiveResponse,
+    addSummary,
   } = useMetherStore();
 
   const isConnected = connectionStatus === "connected";
@@ -148,6 +149,16 @@ export function useWebSocket(): WebSocketHook {
           break;
 
         case "pong":
+          break;
+
+        case "whatsapp_auto_reply":
+          if (msg.to && msg.message) {
+            addLog("WA_AUTO", `↩ ${msg.to}: ${msg.message}`);
+          }
+          break;
+
+        case "conversation_summary":
+          addSummary(msg);
           break;
 
         default:

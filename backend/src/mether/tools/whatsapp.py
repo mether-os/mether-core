@@ -1,5 +1,8 @@
 import httpx
 from typing import Any, Dict
+import time
+
+HANDLED_CONTACTS = {}
 
 from mether.tools.base import BaseTool, SecurityLevel, ToolResult
 
@@ -12,20 +15,21 @@ class WhatsAppTool(BaseTool):
     - chats: get recent chats list
     - messages: get messages from a chat. params: chat_id
     - resolve: resolve a contact name to their phone ID. params: query (name)
+    - handle: start or stop auto-handling messages from a contact. params: contact_name (name), active (boolean, default True)
     
     Use 'send' to reply to someone on behalf of user.
     Always confirm with user before sending.
+    Use 'handle' when user asks you to take over or auto-reply to someone.
     """
     security_level = SecurityLevel.WRITE  # WRITE = needs confirmation
     
-    @property
-    def input_schema(self) -> dict[str, Any]:
+    def get_parameters_schema(self) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["send", "chats", "messages", "resolve"],
+                    "enum": ["send", "chats", "messages", "resolve", "handle"],
                     "description": "The action to perform."
                 },
                 "to": {
@@ -43,6 +47,14 @@ class WhatsAppTool(BaseTool):
                 "query": {
                     "type": "string",
                     "description": "The contact name to search for (for 'resolve' action)."
+                },
+                "contact_name": {
+                    "type": "string",
+                    "description": "The contact name to handle messages for."
+                },
+                "active": {
+                    "type": "boolean",
+                    "description": "Whether to start (true) or stop (false) handling."
                 }
             },
             "required": ["action"]
@@ -98,6 +110,33 @@ class WhatsAppTool(BaseTool):
                     resp = await client.post(f"{base}/resolve", json={"query": kwargs["query"]})
                     resp.raise_for_status()
                     return ToolResult(success=True, data=resp.json())
+                    
+                elif action == "handle":
+                    contact_name = kwargs.get("contact_name")
+                    active = kwargs.get("active", True)
+                    if not contact_name:
+                        return ToolResult(success=False, error="Missing 'contact_name' parameter.")
+                        
+                    res_resp = await client.post(f"{base}/resolve", json={"query": contact_name})
+                    if res_resp.status_code != 200:
+                        return ToolResult(success=False, error=f"Could not resolve {contact_name}")
+                        
+                    resolved = res_resp.json()
+                    contact_id = resolved["id"]
+                    resolved_name = resolved["name"]
+                    
+                    if active:
+                        HANDLED_CONTACTS[contact_id] = {
+                            "name": resolved_name,
+                            "start_time": time.time(),
+                            "last_activity": time.time(),
+                            "messages": []
+                        }
+                        return ToolResult(success=True, data={"message": f"Now handling {resolved_name}", "contact": resolved_name})
+                    else:
+                        if contact_id in HANDLED_CONTACTS:
+                            HANDLED_CONTACTS[contact_id]["stop_requested"] = True
+                        return ToolResult(success=True, data={"message": f"Stopped handling {resolved_name}. Summary is being generated."})
                 
                 return ToolResult(success=False, error=f"Unknown action: {action}")
             except httpx.HTTPError as e:

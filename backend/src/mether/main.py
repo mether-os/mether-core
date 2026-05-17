@@ -20,7 +20,9 @@ from mether.events.bus import EventBus
 from mether.memory.context import ContextMemory
 from mether.tools.registry import ToolRegistry
 from mether.tools.system import SystemTool
-from mether.tools.whatsapp import WhatsAppTool
+from mether.tools.whatsapp import WhatsAppTool, HANDLED_CONTACTS
+import asyncio
+import time
 
 
 import logging as _stdlib_logging
@@ -52,6 +54,43 @@ def _configure_logging(level: str) -> None:
         cache_logger_on_first_use=True,
     )
 
+async def auto_handle_monitor(app: FastAPI):
+    """Monitor handled contacts for 10 min inactivity or manual stops to generate summaries."""
+    while True:
+        await asyncio.sleep(5)
+        now = time.time()
+        to_remove = []
+        for cid, hc in list(HANDLED_CONTACTS.items()):
+            if hc.get("stop_requested") or now - hc["last_activity"] > 600: # 10 mins or manually stopped
+                to_remove.append(cid)
+                
+        for cid in to_remove:
+            hc = HANDLED_CONTACTS.pop(cid, None)
+            if not hc: continue
+            
+            name = hc["name"]
+            duration = int((now - hc["start_time"]) / 60)
+            msg_count = len(hc["messages"])
+            
+            prompt = f"Summarize this WhatsApp conversation between Mayank's AI and {name}. Give: key topics discussed, any important info shared, any action items for Mayank. Keep it bullet points, max 5 bullets.\n\n"
+            for m in hc["messages"]:
+                speaker = "AI" if m["role"] == "assistant" else name
+                prompt += f"{speaker}: {m['content']}\n"
+                
+            try:
+                llm_resp = await app.state.llm.chat(messages=[{"role": "user", "content": prompt}], system="You are a helpful summarizer.")
+                content = llm_resp.get("content", [])
+                summary = content[0].get("text", "") if content else "Summary failed."
+            except Exception:
+                summary = "Error generating summary."
+                
+            await app.state.bus.emit("ws.send", {
+                "type": "conversation_summary",
+                "contact": name,
+                "summary": summary,
+                "message_count": msg_count,
+                "duration": f"{duration} min"
+            })
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -100,8 +139,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     print("\n  ⚡  METHER OS Backend v0.1.0 — ONLINE\n", file=sys.stderr)
 
+    task = asyncio.create_task(auto_handle_monitor(app))
+
     yield
 
+    task.cancel()
     # ---------- Shutdown ----------
     log.info("shutdown.begin")
     await llm.close()

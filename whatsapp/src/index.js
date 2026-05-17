@@ -52,7 +52,8 @@ client.on('message', async (msg) => {
   const payload = {
     id: msg.id._serialized,
     from: msg.from,
-    fromName: contact.pushname || contact.name || msg.from,
+    contactNumber: contact.number || null,
+    fromName: contact.name || contact.pushname || msg.from,
     body: msg.body,
     timestamp: msg.timestamp,
     isGroup: chat.isGroup,

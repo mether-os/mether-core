@@ -12,7 +12,7 @@ from mether.config import Settings
 logger = structlog.get_logger(__name__)
 
 # Timeout for a single LLM round-trip.
-_LLM_TIMEOUT = 30.0
+_LLM_TIMEOUT = 120.0
 
 
 class LLMClient:

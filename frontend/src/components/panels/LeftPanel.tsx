@@ -42,6 +42,7 @@ const MODULE_COLORS: Record<string, string> = {
   CMD: "text-primary",
   METHER: "text-primary-fixed",
   WA: "text-success",
+  WA_AUTO: "text-success opacity-80",
 };
 
 /* ── Helpers ── */
@@ -242,10 +243,29 @@ function LogLine({ entry }: { entry: { id: number; time: string; module: string;
   );
 }
 
+function ConversationSummaryCard({ summary, onDismiss }: { summary: any, onDismiss: () => void }) {
+  return (
+    <div className="hud-panel border border-warning/50 bg-warning/5 p-2 mb-2 relative animate-type-in shrink-0">
+      <button onClick={onDismiss} className="absolute top-1 right-2 text-outline-variant hover:text-warning text-[10px]">✕</button>
+      <div className="text-[10px] font-mono text-warning font-bold mb-1">[CONVERSATION SUMMARY] {summary.contact}</div>
+      <div className="text-[9px] font-mono text-on-surface-variant whitespace-pre-wrap leading-relaxed">
+        {summary.summary}
+      </div>
+      <div className="mt-1 flex justify-between text-[8px] text-outline-variant font-mono">
+        <span>Msgs: {summary.message_count}</span>
+        <span>Dur: {summary.duration}</span>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════
    LEFT PANEL — Main Export
    ═══════════════════════════════════════════════════════════════ */
 export default function LeftPanel() {
+  const summaries = useMetherStore(s => s.summaries);
+  const dismissSummary = useMetherStore(s => s.dismissSummary);
+
   return (
     <div className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container">
       <span className="hud-corner-bracket--extra absolute inset-0 pointer-events-none" />
@@ -253,6 +273,10 @@ export default function LeftPanel() {
       <SystemVitals />
 
       <div className="my-2 h-px bg-primary/15 shrink-0" />
+      
+      {summaries.map((sum, i) => (
+        <ConversationSummaryCard key={i} summary={sum} onDismiss={() => dismissSummary(i)} />
+      ))}
 
       <AgentLog />
     </div>
