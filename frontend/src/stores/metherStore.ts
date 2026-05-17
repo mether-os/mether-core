@@ -37,9 +37,11 @@ export interface WAPing {
 
 /* ── Store interface ── */
 interface MetherState {
-  /* Voice Orb */
+  /* Voice Orb & Pipeline */
   orbState: OrbState;
   setOrbState: (s: OrbState) => void;
+  voiceStatus: "offline" | "online";
+  setVoiceStatus: (s: "offline" | "online") => void;
 
   /* WebSocket */
   connectionStatus: ConnectionStatus;
@@ -108,9 +110,11 @@ const MAX_HISTORY = 10;
 
 /* ── Store ── */
 export const useMetherStore = create<MetherState>((set) => ({
-  /* Voice Orb */
+  /* Voice Orb & Pipeline */
   orbState: "idle",
   setOrbState: (s) => set({ orbState: s }),
+  voiceStatus: "offline",
+  setVoiceStatus: (s) => set({ voiceStatus: s }),
 
   /* WebSocket */
   connectionStatus: "disconnected",

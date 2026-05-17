@@ -37,6 +37,7 @@ function StatusDot({ color = "bg-success", delay = "0s" }: { color?: string; del
 function TopBar() {
   const clock = useClock();
   const connectionStatus = useMetherStore((s) => s.connectionStatus);
+  const voiceStatus = useMetherStore((s) => s.voiceStatus);
 
   /* Derive chip configs from connection status */
   const onlineChip =
@@ -78,6 +79,13 @@ function TopBar() {
       {/* ── Right: Status chips (reactive to connection) ── */}
       <div className="flex items-center gap-2">
         <span className={onlineChip.cls}>{onlineChip.label}</span>
+        {voiceStatus === "online" ? (
+          <span className="hud-chip !border-[#c084fc]/50 !text-[#f3e8ff] !bg-[#c084fc]/10 shadow-[0_0_10px_rgba(192,132,252,0.2)]">
+            ● VOICE
+          </span>
+        ) : (
+          <span className="hud-chip opacity-50">○ VOICE</span>
+        )}
         <span className="hud-chip">SECURE</span>
         <span className={`hud-chip ${connectionStatus === "connected" ? "hud-chip--success" : ""}`}>
           SYNC

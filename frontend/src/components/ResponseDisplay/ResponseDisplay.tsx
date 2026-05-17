@@ -54,7 +54,11 @@ export default function ResponseDisplay() {
 
   useEffect(() => {
     if (activeResponse) {
-      streamResponse(activeResponse);
+      if (activeResponse.startsWith("[VOICE] ")) {
+        streamResponse(activeResponse.substring(8));
+      } else {
+        streamResponse(activeResponse);
+      }
     } else {
       setDisplayText("");
       setIsStreaming(false);
@@ -72,21 +76,25 @@ export default function ResponseDisplay() {
 
   if (!displayText) return null;
 
+  const isVoice = activeResponse?.startsWith("[VOICE] ");
+  const prefixColor = isVoice ? "#c084fc" : "#00e5ff"; // purple-400 vs cyan-400
+  const textColor = isVoice ? "#f3e8ff" : "#e0ffff"; // purple-100 vs cyan-100
+
   return (
     <div
       id="response-display"
       className="fixed left-0 right-0 z-50 flex items-end justify-center px-6 pointer-events-none"
       style={{ bottom: 80 + 8 }}
     >
-      <div className="max-w-[800px] w-full flex items-start gap-3 px-5 py-4
-                      bg-surface-container-lowest/95 border border-primary/30 backdrop-blur-md shadow-2xl pointer-events-auto max-h-[60vh] overflow-y-auto rounded-sm">
-        <span className="text-data-mono text-cyan-400 shrink-0 font-bold tracking-wider pt-0.5" style={{ color: "#00e5ff" }}>
-          METHER &gt;
+      <div className={`max-w-[800px] w-full flex items-start gap-3 px-5 py-4
+                      bg-surface-container-lowest/95 border backdrop-blur-md shadow-2xl pointer-events-auto max-h-[60vh] overflow-y-auto rounded-sm ${isVoice ? 'border-purple-500/30' : 'border-primary/30'}`}>
+        <span className="text-data-mono shrink-0 font-bold tracking-wider pt-0.5" style={{ color: prefixColor }}>
+          {isVoice ? "🎤 METHER >" : "METHER >"}
         </span>
-        <span className="ai-response-text text-cyan-100 whitespace-pre-wrap leading-relaxed flex-1 text-sm font-mono tracking-wide" style={{ color: "#e0ffff" }}>
+        <span className="ai-response-text whitespace-pre-wrap leading-relaxed flex-1 text-sm font-mono tracking-wide" style={{ color: textColor }}>
           {displayText}
           {showCursor && (
-             <span className="inline-block w-2 h-4 bg-cyan-400 ml-1 align-middle" style={{ animation: "flicker 1s steps(2) infinite" }} />
+             <span className="inline-block w-2 h-4 ml-1 align-middle" style={{ backgroundColor: prefixColor, animation: "flicker 1s steps(2) infinite" }} />
           )}
         </span>
       </div>

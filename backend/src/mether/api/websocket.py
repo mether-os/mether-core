@@ -188,3 +188,56 @@ async def websocket_endpoint(
         await bus.unsubscribe("tool.start", _forward_tool_start)
         await bus.unsubscribe("tool.done", _forward_tool_done)
         app.state.ws_client_count = max(0, getattr(app.state, "ws_client_count", 1) - 1)
+
+
+@app.websocket("/ws/voice")
+async def voice_ws(websocket: WebSocket):
+    """WebSocket connection exclusively for the Voice Pipeline Sidecar."""
+    logger = structlog.get_logger(__name__)
+    await websocket.accept()
+    logger.info("Voice sidecar connected")
+    
+    app = websocket.app
+    bus = app.state.bus
+    agent = app.state.agent
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            
+            if data.get("type") == "voice_input":
+                text = data.get("text", "")
+                
+                # 1. Emit orb to processing state
+                await bus.emit("ws.send", {"type": "orb_state", "state": "processing"})
+                
+                # 2. Add to frontend log
+                await bus.emit("ws.send", {
+                    "type": "log", "module": "VOICE", 
+                    "message": f"Processing: {text}"
+                })
+                
+                # 3. Run through agent
+                try:
+                    response = await agent.process(text)
+                except Exception as e:
+                    logger.error(f"Voice agent error: {e}")
+                    response = "Sorry, I encountered an error."
+                
+                # 4. Send response back to voice sidecar
+                await websocket.send_json({
+                    "type": "voice_response",
+                    "text": response
+                })
+                
+                # 5. Also send to frontend display
+                await bus.emit("ws.send", {
+                    "type": "response",
+                    "text": response,
+                    "source": "voice"
+                })
+    
+    except WebSocketDisconnect:
+        logger.info("Voice sidecar disconnected")
+        await bus.emit("ws.send", {"type": "log", "module": "VOICE", "message": "Pipeline disconnected"})
+        await bus.emit("ws.send", {"type": "voice_status", "status": "offline"})

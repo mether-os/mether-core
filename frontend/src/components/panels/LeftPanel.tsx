@@ -35,7 +35,7 @@ const MODULE_COLORS: Record<string, string> = {
   AGENT: "text-primary",
   MEMORY: "text-secondary",
   TOOL: "text-warning",
-  VOICE: "text-success",
+  VOICE: "text-[#c084fc]",
   WS: "text-primary-container",
   LLM: "text-primary-fixed-dim",
   SYSTEM: "text-on-surface-variant",

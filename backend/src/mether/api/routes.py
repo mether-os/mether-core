@@ -176,3 +176,40 @@ async def whatsapp_status():
             return resp.json()
     except httpx.HTTPError as e:
         return {"status": "disconnected", "error": str(e)}
+
+@router.post("/voice/event")
+async def voice_event(request: Request):
+    """Receive lifecycle events from the voice sidecar."""
+    logger = structlog.get_logger(__name__)
+    bus = request.app.state.bus
+    
+    body = await request.json()
+    event = body.get("event")
+    data = body.get("data", {})
+    
+    if event == "voice.online":
+        logger.info("[VOICE] Pipeline online")
+        await bus.emit("ws.send", {"type": "log", "module": "VOICE", "message": "Pipeline online"})
+        await bus.emit("ws.send", {"type": "voice_status", "status": "online"})
+        
+    elif event == "voice.offline":
+        logger.info("[VOICE] Pipeline offline")
+        await bus.emit("ws.send", {"type": "log", "module": "VOICE", "message": "Pipeline offline"})
+        await bus.emit("ws.send", {"type": "voice_status", "status": "offline"})
+        
+    elif event == "voice.wake":
+        logger.info("[VOICE] Wake word detected")
+        await bus.emit("ws.send", {"type": "orb_state", "state": "listening"})
+        await bus.emit("ws.send", {"type": "log", "module": "VOICE", "message": "Wake word detected"})
+        
+    elif event == "voice.transcript":
+        text = data.get("text", "")
+        await bus.emit("ws.send", {"type": "log", "module": "VOICE", "message": f"Heard: {text}"})
+        
+    elif event == "voice.speaking":
+        await bus.emit("ws.send", {"type": "orb_state", "state": "speaking"})
+        
+    elif event == "voice.done":
+        await bus.emit("ws.send", {"type": "orb_state", "state": "idle"})
+        
+    return {"success": True}

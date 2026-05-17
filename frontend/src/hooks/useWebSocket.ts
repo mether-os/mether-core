@@ -32,6 +32,7 @@ export function useWebSocket(): WebSocketHook {
     addPing,
     removePing,
     setSocketSend,
+    setVoiceStatus,
   } = useMetherStore();
 
   const isConnected = connectionStatus === "connected";
@@ -111,7 +112,15 @@ export function useWebSocket(): WebSocketHook {
 
         case "response":
           if (typeof msg.text === "string") {
-            setActiveResponse(msg.text);
+            // Include source prefix if from voice
+            const text = msg.source === "voice" ? `[VOICE] ${msg.text}` : msg.text;
+            setActiveResponse(text);
+          }
+          break;
+
+        case "voice_status":
+          if (typeof msg.status === "string" && (msg.status === "online" || msg.status === "offline")) {
+            setVoiceStatus(msg.status);
           }
           break;
 
