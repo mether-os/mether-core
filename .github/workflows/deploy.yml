@@ -8,6 +8,8 @@ on:
 jobs:
   deploy-frontend:
     runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +23,7 @@ jobs:
           VITE_BACKEND_URL: ${{ secrets.RENDER_BACKEND_URL }}
           VITE_WS_URL: ${{ secrets.RENDER_WS_URL }}
       - name: Deploy to Vercel
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        if: ${{ env.VERCEL_TOKEN != '' }}
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -32,12 +34,15 @@ jobs:
 
   notify-render:
     runs-on: ubuntu-latest
+    env:
+      RENDER_DEPLOY_HOOK_BACKEND: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
+      RENDER_DEPLOY_HOOK_PROXY: ${{ secrets.RENDER_DEPLOY_HOOK_PROXY }}
     steps:
       - name: Trigger Render backend deploy
-        if: ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND != '' }}
+        if: ${{ env.RENDER_DEPLOY_HOOK_BACKEND != '' }}
         run: |
           curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_BACKEND }}
       - name: Trigger Render proxy deploy
-        if: ${{ secrets.RENDER_DEPLOY_HOOK_PROXY != '' }}
+        if: ${{ env.RENDER_DEPLOY_HOOK_PROXY != '' }}
         run: |
           curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK_PROXY }}
