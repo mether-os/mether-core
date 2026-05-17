@@ -190,7 +190,6 @@ async def websocket_endpoint(
         app.state.ws_client_count = max(0, getattr(app.state, "ws_client_count", 1) - 1)
 
 
-@app.websocket("/ws/voice")
 async def voice_ws(websocket: WebSocket):
     """WebSocket connection exclusively for the Voice Pipeline Sidecar."""
     logger = structlog.get_logger(__name__)

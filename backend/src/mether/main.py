@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from mether.agent.agent import METHERAgent
 from mether.agent.llm import LLMClient
 from mether.api.routes import router
-from mether.api.websocket import websocket_endpoint
+from mether.api.websocket import websocket_endpoint, voice_ws
 from mether.config import Settings, get_settings
 from mether.events.bus import EventBus
 from mether.memory.context import ContextMemory
@@ -182,6 +182,11 @@ app.include_router(router)
 async def ws(websocket: WebSocket) -> None:
     """WebSocket entry point — delegates to the handler module."""
     await websocket_endpoint(websocket, app.state.agent, app.state.bus)
+
+@app.websocket("/ws/voice")
+async def ws_voice(websocket: WebSocket) -> None:
+    """WebSocket entry point for voice sidecar."""
+    await voice_ws(websocket)
 
 
 # ======================================================================
