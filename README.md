@@ -104,6 +104,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full system design.
 - **Dangerous Action Confirmation** — Visual confirm dialog before destructive operations
 - **Live Terminal** — Streamed command output in the dashboard
 - **Tactical HUD** — Sci-fi dashboard with radar, voice orb, real-time logs
+- **Cloud-Free Core** — Completely local orchestrator and reasoning loop
 
 ---
 
