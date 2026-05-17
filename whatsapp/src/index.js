@@ -1,4 +1,5 @@
 import 'dotenv/config'
+// METHER OS WhatsApp Bridge
 import pkg from 'whatsapp-web.js'
 const { Client, LocalAuth } = pkg
 import qrcode from 'qrcode-terminal'

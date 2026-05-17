@@ -1,3 +1,4 @@
+// METHER OS Frontend
 import { useEffect, useCallback } from "react";
 import HUDLayout from "@/layouts/HUDLayout";
 import { VoiceOrb } from "@/components/VoiceOrb";
