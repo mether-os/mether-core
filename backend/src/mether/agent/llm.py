@@ -84,9 +84,16 @@ class LLMClient:
         try:
             resp = await self._client.post(url, json=body)
             resp.raise_for_status()
-            data = resp.json()
-            logger.debug("llm.response", stop_reason=data.get("stop_reason"))
-            return data
+            
+            content_type = resp.headers.get("content-type", "")
+            if "text/event-stream" in content_type:
+                data = self._parse_sse_response(resp.text)
+                logger.debug("llm.response_sse_parsed", stop_reason=data.get("stop_reason"))
+                return data
+            else:
+                data = resp.json()
+                logger.debug("llm.response", stop_reason=data.get("stop_reason"))
+                return data
 
         except httpx.TimeoutException as exc:
             logger.error("llm.timeout", url=url, detail=str(exc))
@@ -105,6 +112,70 @@ class LLMClient:
         except httpx.HTTPError as exc:
             logger.error("llm.network_error", detail=str(exc))
             raise LLMError(f"LLM proxy unreachable: {exc}") from exc
+
+    def _parse_sse_response(self, text: str) -> dict[str, Any]:
+        """Parse Anthropic SSE format into a standard message dict."""
+        import json
+        
+        final_message: dict[str, Any] = {
+            "id": "",
+            "type": "message",
+            "role": "assistant",
+            "model": self._model,
+            "content": [],
+            "stop_reason": None,
+            "stop_sequence": None,
+            "usage": {}
+        }
+        
+        current_block = None
+        
+        for line in text.splitlines():
+            if line.startswith("data: "):
+                data_str = line[6:].strip()
+                if not data_str or data_str == "[DONE]":
+                    continue
+                    
+                try:
+                    event = json.loads(data_str)
+                    event_type = event.get("type")
+                    
+                    if event_type == "message_start":
+                        final_message["id"] = event["message"].get("id", "")
+                        final_message["usage"] = event["message"].get("usage", {})
+                        
+                    elif event_type == "content_block_start":
+                        block = event["content_block"]
+                        if block["type"] == "tool_use":
+                            block["input"] = "" 
+                        current_block = block
+                        final_message["content"].append(current_block)
+                        
+                    elif event_type == "content_block_delta":
+                        delta = event["delta"]
+                        if current_block:
+                            if delta["type"] == "text_delta":
+                                current_block["text"] = current_block.get("text", "") + delta.get("text", "")
+                            elif delta["type"] == "input_json_delta":
+                                current_block["input"] += delta.get("partial_json", "")
+                                
+                    elif event_type == "content_block_stop":
+                        if current_block and current_block["type"] == "tool_use":
+                            if isinstance(current_block["input"], str):
+                                try:
+                                    current_block["input"] = json.loads(current_block["input"] or "{}")
+                                except json.JSONDecodeError:
+                                    current_block["input"] = {}
+                        current_block = None
+                        
+                    elif event_type == "message_delta":
+                        if "stop_reason" in event["delta"]:
+                            final_message["stop_reason"] = event["delta"]["stop_reason"]
+                            
+                except json.JSONDecodeError:
+                    pass
+
+        return final_message
 
     # ------------------------------------------------------------------
     # Lifecycle

@@ -60,6 +60,10 @@ interface MetherState {
   /* Demo mode */
   isDemo: boolean;
   setDemo: (on: boolean) => void;
+
+  /* Response Display */
+  activeResponse: string | null;
+  setActiveResponse: (res: string | null) => void;
 }
 
 /* ── Helpers ── */
@@ -133,4 +137,8 @@ export const useMetherStore = create<MetherState>((set) => ({
   /* Demo */
   isDemo: true,
   setDemo: (on) => set({ isDemo: on }),
+
+  /* Response Display */
+  activeResponse: null,
+  setActiveResponse: (res) => set({ activeResponse: res }),
 }));

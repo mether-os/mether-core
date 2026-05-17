@@ -18,6 +18,8 @@ interface CommandInputProps {
   isConnected: boolean;
 }
 
+import { useMetherStore } from "@/stores/metherStore";
+
 export default function CommandInput({
   onSubmit,
   commandHistory,
@@ -28,17 +30,23 @@ export default function CommandInput({
   const [isFocused, setIsFocused] = useState(false);
   const [flashKey, setFlashKey] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  const setActiveResponse = useMetherStore((s) => s.setActiveResponse);
 
   /* ── Submit ── */
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim();
     if (!trimmed) return;
 
+    if (!isConnected) {
+      setActiveResponse("[OFFLINE] Cannot process command");
+    }
+
     onSubmit(trimmed);
     setValue("");
     setHistoryIdx(-1);
     setFlashKey((k) => k + 1); // trigger flash animation
-  }, [value, onSubmit]);
+  }, [value, onSubmit, isConnected, setActiveResponse]);
 
   /* ── Keyboard ── */
   const handleKey = useCallback(

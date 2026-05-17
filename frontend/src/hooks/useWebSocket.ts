@@ -2,16 +2,6 @@ import { useEffect, useRef, useCallback } from "react";
 import { useMetherStore } from "@/stores/metherStore";
 import type { ConnectionStatus } from "@/stores/metherStore";
 
-/* ═══════════════════════════════════════════════════════════════
-   METHER OS — WebSocket Connection Manager
-
-   • Auto-connects to ws://localhost:8000/ws on mount
-   • Exponential backoff reconnect (1s → 2s → 4s → 8s max)
-   • Parses incoming JSON: { type, data }
-   • Routes messages to Zustand store
-   • Graceful fallback to demo mode when backend is offline
-   ═══════════════════════════════════════════════════════════════ */
-
 const WS_URL = "ws://localhost:8000/ws";
 const BASE_DELAY = 1000;
 const MAX_DELAY = 8000;
@@ -37,15 +27,14 @@ export function useWebSocket(): WebSocketHook {
     setOrbState,
     incrementStat,
     setActiveTool,
+    setActiveResponse,
   } = useMetherStore();
 
   const isConnected = connectionStatus === "connected";
 
-  /* ── Connect ── */
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
 
-    // Clean up existing socket
     if (wsRef.current) {
       wsRef.current.onopen = null;
       wsRef.current.onclose = null;
@@ -72,11 +61,7 @@ export function useWebSocket(): WebSocketHook {
       ws.onclose = (e) => {
         if (!mountedRef.current) return;
         setConnectionStatus("disconnected");
-
-        if (e.code !== 1000) {
-          // Abnormal close → retry
-          scheduleReconnect();
-        }
+        if (e.code !== 1000) scheduleReconnect();
       };
 
       ws.onerror = () => {
@@ -91,10 +76,9 @@ export function useWebSocket(): WebSocketHook {
         lastMessageRef.current = event.data;
 
         try {
-          const msg = JSON.parse(event.data) as { type: string; data?: unknown };
+          const msg = JSON.parse(event.data) as Record<string, any>;
           handleMessage(msg);
         } catch {
-          // Non-JSON message — treat as raw text
           addLog("WS", String(event.data));
         }
       };
@@ -106,20 +90,42 @@ export function useWebSocket(): WebSocketHook {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Handle parsed messages ── */
   const handleMessage = useCallback(
-    (msg: { type: string; data?: unknown }) => {
+    (msg: Record<string, any>) => {
       switch (msg.type) {
         case "orb_state":
-          if (typeof msg.data === "string") {
-            setOrbState(msg.data as "idle" | "listening" | "processing" | "speaking");
+          if (typeof msg.state === "string") {
+            setOrbState(msg.state as "idle" | "listening" | "processing" | "speaking");
           }
           break;
 
         case "log":
-          if (msg.data && typeof msg.data === "object" && "module" in msg.data && "message" in msg.data) {
-            const d = msg.data as { module: string; message: string };
-            addLog(d.module, d.message);
+          if (typeof msg.module === "string" && typeof msg.message === "string") {
+            addLog(msg.module, msg.message);
+          }
+          break;
+
+        case "response":
+          if (typeof msg.text === "string") {
+            setActiveResponse(msg.text);
+          }
+          break;
+
+        case "agent.thinking":
+          // Handled visually via orb state, no need to clutter logs
+          break;
+
+        case "tool.start":
+          if (msg.data && msg.data.tool) {
+            setActiveTool(msg.data.tool);
+            addLog("TOOL", `Active: ${msg.data.tool}`);
+          }
+          break;
+
+        case "tool.done":
+          if (msg.data && msg.data.tool) {
+            addLog("TOOL", `Done: ${msg.data.tool}`);
+            setActiveTool("STANDBY");
           }
           break;
 
@@ -142,23 +148,19 @@ export function useWebSocket(): WebSocketHook {
           break;
 
         case "pong":
-          // Heartbeat response — no-op
           break;
 
         default:
           addLog("WS", `Unknown message type: ${msg.type}`);
       }
     },
-    [addLog, setOrbState, setActiveTool, incrementStat]
+    [addLog, setOrbState, setActiveTool, incrementStat, setActiveResponse]
   );
 
-  /* ── Reconnect with exponential backoff ── */
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
-
     const delay = Math.min(BASE_DELAY * Math.pow(2, retryCount.current), MAX_DELAY);
     retryCount.current++;
-
     addLog("WS", `Reconnecting in ${delay / 1000}s (attempt ${retryCount.current})`);
 
     retryTimer.current = setTimeout(() => {
@@ -167,14 +169,13 @@ export function useWebSocket(): WebSocketHook {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connect]);
 
-  /* ── Send ── */
   const send = useCallback(
     (message: string) => {
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "command", data: message }));
+        // Updated payload to match backend expectation '{"type": "message", "text": userInput}'
+        ws.send(JSON.stringify({ type: "message", text: message }));
       } else {
-        // Offline — log locally
         addLog("CMD", message);
         addLog("SYSTEM", "Command queued — backend offline");
       }
@@ -182,7 +183,6 @@ export function useWebSocket(): WebSocketHook {
     [addLog]
   );
 
-  /* ── Lifecycle ── */
   useEffect(() => {
     mountedRef.current = true;
     connect();
@@ -191,7 +191,7 @@ export function useWebSocket(): WebSocketHook {
       mountedRef.current = false;
       if (retryTimer.current) clearTimeout(retryTimer.current);
       if (wsRef.current) {
-        wsRef.current.onclose = null; // prevent reconnect on unmount
+        wsRef.current.onclose = null;
         wsRef.current.close(1000);
       }
     };

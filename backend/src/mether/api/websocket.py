@@ -86,11 +86,24 @@ async def websocket_endpoint(
 
                 logger.info("ws.message_received", text=text[:100])
                 await bus.emit("message.received", {"text": text})
+                
+                # Emit to bus for other components
+                await bus.emit("agent.thinking", {"message": text})
+
+                # Send processing state and log to frontend immediately
+                await websocket.send_json({"type": "orb_state", "state": "processing"})
+                await websocket.send_json({
+                    "type": "log",
+                    "module": "AGENT",
+                    "message": f"Processing: {text}"
+                })
 
                 # Process through the agent (may involve tool calls).
                 response = await agent.process(text)
 
+                # Send response and reset orb state to idle
                 await websocket.send_json({"type": "response", "text": response})
+                await websocket.send_json({"type": "orb_state", "state": "idle"})
 
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})

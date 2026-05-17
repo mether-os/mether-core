@@ -17,7 +17,10 @@ logger = structlog.get_logger(__name__)
 # Maximum tool-call iterations per single user message to prevent runaway loops.
 _MAX_TOOL_ROUNDS = 5
 
-_FALLBACK_RESPONSE = "METHER: LLM proxy offline. Running in limited mode."
+_FALLBACK_RESPONSE = (
+    "METHER OFFLINE — LLM proxy unreachable.\n"
+    "Start free-claude-code on port 8082 to enable AI responses."
+)
 
 
 class METHERAgent:
