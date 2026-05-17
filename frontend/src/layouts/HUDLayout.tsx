@@ -1,16 +1,20 @@
 import type { ReactNode } from "react";
 import { useClock } from "@/hooks/useClock";
 import { useUptime } from "@/hooks/useUptime";
+import { useMetherStore } from "@/stores/metherStore";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — HUD Layout Shell
    Tactical HUD with 4 pinned edge zones + open center viewport.
+   Now includes command bar zone above the bottom status bar.
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Dimension constants ── */
-const TOP_BAR_H = 40;   // px
-const BOTTOM_BAR_H = 32; // px
-const SIDE_PANEL_W = 240; // px
+const TOP_BAR_H = 40;       // px
+const COMMAND_BAR_H = 48;   // px
+const BOTTOM_BAR_H = 32;    // px
+const BOTTOM_TOTAL = COMMAND_BAR_H + BOTTOM_BAR_H; // 80px
+const SIDE_PANEL_W = 240;   // px
 
 /* ── Status dot — blinking activity indicator ── */
 function StatusDot({ color = "bg-success", delay = "0s" }: { color?: string; delay?: string }) {
@@ -27,9 +31,21 @@ function StatusDot({ color = "bg-success", delay = "0s" }: { color?: string; del
 
 /* ═══════════════════════════════════════════════════════════════
    TOP BAR — System identification & status
+   Now reads connection status from Zustand store.
    ═══════════════════════════════════════════════════════════════ */
 function TopBar() {
   const clock = useClock();
+  const connectionStatus = useMetherStore((s) => s.connectionStatus);
+
+  /* Derive chip configs from connection status */
+  const onlineChip =
+    connectionStatus === "connected"
+      ? { label: "ONLINE", cls: "hud-chip hud-chip--success" }
+      : connectionStatus === "connecting"
+        ? { label: "CONNECTING", cls: "hud-chip hud-chip--warning" }
+        : connectionStatus === "error"
+          ? { label: "ERROR", cls: "hud-chip hud-chip--error" }
+          : { label: "OFFLINE", cls: "hud-chip hud-chip--error" };
 
   return (
     <header
@@ -58,11 +74,13 @@ function TopBar() {
         </span>
       </div>
 
-      {/* ── Right: Status chips ── */}
+      {/* ── Right: Status chips (reactive to connection) ── */}
       <div className="flex items-center gap-2">
-        <span className="hud-chip hud-chip--success">ONLINE</span>
+        <span className={onlineChip.cls}>{onlineChip.label}</span>
         <span className="hud-chip">SECURE</span>
-        <span className="hud-chip">SYNC</span>
+        <span className={`hud-chip ${connectionStatus === "connected" ? "hud-chip--success" : ""}`}>
+          SYNC
+        </span>
       </div>
     </header>
   );
@@ -73,6 +91,7 @@ function TopBar() {
    ═══════════════════════════════════════════════════════════════ */
 function BottomBar() {
   const uptime = useUptime();
+  const activeTool = useMetherStore((s) => s.activeTool);
 
   return (
     <footer
@@ -81,11 +100,11 @@ function BottomBar() {
                  bg-surface-container border-t border-primary/20 select-none"
       style={{ height: BOTTOM_BAR_H }}
     >
-      {/* ── Left: Active tool name ── */}
+      {/* ── Left: Active tool name (from store) ── */}
       <div className="flex items-center gap-2 min-w-[180px]">
         <span className="text-data-mono text-outline tracking-[0.08em]">&gt; TOOL:</span>
         <span className="text-data-mono text-on-surface-variant tracking-wider">
-          STANDBY
+          {activeTool}
         </span>
       </div>
 
@@ -108,7 +127,7 @@ function BottomBar() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SIDE PANEL — Left / Right placeholder containers
+   SIDE PANEL — Left / Right containers
    ═══════════════════════════════════════════════════════════════ */
 function SidePanel({ side, children }: { side: "left" | "right"; children?: ReactNode }) {
   const posClass = side === "left" ? "left-0" : "right-0";
@@ -119,7 +138,7 @@ function SidePanel({ side, children }: { side: "left" | "right"; children?: Reac
       className={`fixed ${posClass} z-40 overflow-y-auto overflow-x-hidden`}
       style={{
         top: TOP_BAR_H,
-        bottom: BOTTOM_BAR_H,
+        bottom: BOTTOM_TOTAL,
         width: SIDE_PANEL_W,
       }}
     >
@@ -176,7 +195,7 @@ function CenterViewport({ children }: { children?: ReactNode }) {
       className="fixed z-30 flex items-center justify-center overflow-hidden"
       style={{
         top: TOP_BAR_H,
-        bottom: BOTTOM_BAR_H,
+        bottom: BOTTOM_TOTAL,
         left: SIDE_PANEL_W,
         right: SIDE_PANEL_W,
       }}
@@ -215,24 +234,30 @@ function CenterViewport({ children }: { children?: ReactNode }) {
 /* ═══════════════════════════════════════════════════════════════
    HUD LAYOUT — Main export
    Composes all edge zones around a central viewport.
+   CommandInput is passed as a prop and rendered between
+   the center viewport and the bottom bar.
    ═══════════════════════════════════════════════════════════════ */
 interface HUDLayoutProps {
   children?: ReactNode;
   leftPanel?: ReactNode;
   rightPanel?: ReactNode;
-  activeTool?: string;
+  commandBar?: ReactNode;
 }
 
 export default function HUDLayout({
   children,
   leftPanel,
   rightPanel,
+  commandBar,
 }: HUDLayoutProps) {
   return (
     <div id="hud-layout" className="min-h-screen bg-void scan-line-overlay noise-overlay">
       {/* ── Edge bars ── */}
       <TopBar />
       <BottomBar />
+
+      {/* ── Command bar (above bottom bar) ── */}
+      {commandBar}
 
       {/* ── Side panels ── */}
       <SidePanel side="left">{leftPanel}</SidePanel>

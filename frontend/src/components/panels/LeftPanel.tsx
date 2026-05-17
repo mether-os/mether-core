@@ -1,18 +1,22 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useUptime } from "@/hooks/useUptime";
+import { useMetherStore } from "@/stores/metherStore";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Left Panel
    System Vitals (top 30%) + Agent Log terminal (bottom 70%)
+
+   Agent Log now reads from the global Zustand store AND generates
+   demo entries when in demo mode, providing a unified feed.
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Constants ── */
 const SEGMENT_COUNT = 10;
-const MAX_LOG_ENTRIES = 20;
+const MAX_LOG_DISPLAY = 20;
 const LOG_INTERVAL_MS = 1500;
 const VITALS_INTERVAL_MS = 2000;
 
-/* ── Log message pool ── */
+/* ── Log message pool (demo mode) ── */
 const LOG_POOL: [string, string][] = [
   ["AGENT", "Reasoning over context..."],
   ["MEMORY", "Fetching from ChromaDB..."],
@@ -35,24 +39,16 @@ const MODULE_COLORS: Record<string, string> = {
   WS: "text-primary-container",
   LLM: "text-primary-fixed-dim",
   SYSTEM: "text-on-surface-variant",
+  CMD: "text-primary",
 };
 
 /* ── Helpers ── */
-function timestamp(): string {
-  return new Date().toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-}
-
 function randomInRange(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SECTION HEADER — Reusable panel section title
+   SECTION HEADER
    ═══════════════════════════════════════════════════════════════ */
 function SectionHeader({ title }: { title: string }) {
   return (
@@ -65,7 +61,7 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SEGMENTED BAR — [■■■■□□□□□□] progress visualization
+   SEGMENTED BAR
    ═══════════════════════════════════════════════════════════════ */
 function SegmentedBar({ value, max = 100 }: { value: number; max?: number }) {
   const filled = Math.round((value / max) * SEGMENT_COUNT);
@@ -91,7 +87,7 @@ function SegmentedBar({ value, max = 100 }: { value: number; max?: number }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   METRIC ROW — Label + value + optional bar
+   METRIC ROW
    ═══════════════════════════════════════════════════════════════ */
 interface MetricRowProps {
   label: string;
@@ -103,7 +99,6 @@ interface MetricRowProps {
 function MetricRow({ label, value, bar, blinkDot }: MetricRowProps) {
   return (
     <div className="flex items-center justify-between gap-2 py-[5px]">
-      {/* Label */}
       <div className="flex items-center gap-1.5 min-w-[60px]">
         {blinkDot && (
           <span
@@ -116,10 +111,8 @@ function MetricRow({ label, value, bar, blinkDot }: MetricRowProps) {
         </span>
       </div>
 
-      {/* Bar (optional) */}
       {bar !== undefined && <SegmentedBar value={bar} />}
 
-      {/* Value */}
       <span className="text-data-mono text-primary font-bold tracking-wider text-right min-w-[38px]">
         {value}
       </span>
@@ -128,7 +121,7 @@ function MetricRow({ label, value, bar, blinkDot }: MetricRowProps) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   SYSTEM VITALS — Top 30% of panel
+   SYSTEM VITALS — Top 30%
    ═══════════════════════════════════════════════════════════════ */
 function SystemVitals() {
   const uptime = useUptime();
@@ -162,58 +155,48 @@ function SystemVitals() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   AGENT LOG — Bottom 70% of panel (scrolling terminal feed)
+   AGENT LOG — Bottom 70%
+   Reads from global store + generates demo entries.
    ═══════════════════════════════════════════════════════════════ */
-interface LogEntry {
-  id: number;
-  time: string;
-  module: string;
-  message: string;
-}
-
 function AgentLog() {
-  const [entries, setEntries] = useState<LogEntry[]>([]);
-  const nextId = useRef(0);
+  const storeLogs = useMetherStore((s) => s.logs);
+  const addLog = useMetherStore((s) => s.addLog);
+  const isDemo = useMetherStore((s) => s.isDemo);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const demoSeeded = useRef(false);
 
-  /* Pick a random log */
-  const pickRandom = useCallback((): LogEntry => {
-    const [module, message] = LOG_POOL[Math.floor(Math.random() * LOG_POOL.length)];
-    return { id: nextId.current++, time: timestamp(), module, message };
-  }, []);
-
-  /* Seed initial entries */
-  const initialEntries = useMemo(() => {
-    const seed: LogEntry[] = [];
+  /* Seed initial demo logs */
+  const seedLogs = useCallback(() => {
+    if (demoSeeded.current) return;
+    demoSeeded.current = true;
     for (let i = 0; i < 5; i++) {
       const [module, message] = LOG_POOL[i % LOG_POOL.length];
-      seed.push({ id: nextId.current++, time: timestamp(), module, message });
+      addLog(module, message);
     }
-    return seed;
-  }, []);
+  }, [addLog]);
 
-  useEffect(() => {
-    setEntries(initialEntries);
-  }, [initialEntries]);
+  useMemo(() => seedLogs(), [seedLogs]);
 
-  /* Add new entries on interval */
+  /* Demo mode: add random entries periodically */
   useEffect(() => {
+    if (!isDemo) return;
+
     const id = setInterval(() => {
-      setEntries((prev) => {
-        const next = [...prev, pickRandom()];
-        return next.length > MAX_LOG_ENTRIES ? next.slice(-MAX_LOG_ENTRIES) : next;
-      });
+      const [module, message] = LOG_POOL[Math.floor(Math.random() * LOG_POOL.length)];
+      addLog(module, message);
     }, LOG_INTERVAL_MS);
+
     return () => clearInterval(id);
-  }, [pickRandom]);
+  }, [isDemo, addLog]);
 
   /* Auto-scroll to bottom */
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [entries]);
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [storeLogs]);
+
+  /* Display last N entries */
+  const visibleLogs = storeLogs.slice(-MAX_LOG_DISPLAY);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -231,7 +214,7 @@ function AgentLog() {
         }}
       >
         <div className="flex flex-col gap-[2px]">
-          {entries.map((entry) => (
+          {visibleLogs.map((entry) => (
             <LogLine key={entry.id} entry={entry} />
           ))}
         </div>
@@ -240,8 +223,8 @@ function AgentLog() {
   );
 }
 
-/* ── Single log line with typewriter entrance ── */
-function LogLine({ entry }: { entry: LogEntry }) {
+/* ── Log line ── */
+function LogLine({ entry }: { entry: { id: number; time: string; module: string; message: string } }) {
   const moduleColor = MODULE_COLORS[entry.module] ?? "text-outline";
 
   return (
@@ -258,21 +241,16 @@ function LogLine({ entry }: { entry: LogEntry }) {
 
 /* ═══════════════════════════════════════════════════════════════
    LEFT PANEL — Main Export
-   Composes vitals + log inside a corner-bracketed frame.
    ═══════════════════════════════════════════════════════════════ */
 export default function LeftPanel() {
   return (
     <div className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container">
-      {/* Extra corners (top-right + bottom-left) */}
       <span className="hud-corner-bracket--extra absolute inset-0 pointer-events-none" />
 
-      {/* Section 1 — System Vitals (top ~30%) */}
       <SystemVitals />
 
-      {/* Divider */}
       <div className="my-2 h-px bg-primary/15 shrink-0" />
 
-      {/* Section 2 — Agent Log (bottom ~70%) */}
       <AgentLog />
     </div>
   );
