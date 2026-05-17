@@ -27,6 +27,14 @@ export interface SessionStats {
   tokens: number;
 }
 
+export interface WAPing {
+  ping_id: string;
+  contact_id: string;
+  contact_name: string;
+  preview: string;
+  timestamp: number;
+}
+
 /* ── Store interface ── */
 interface MetherState {
   /* Voice Orb */
@@ -69,6 +77,18 @@ interface MetherState {
   summaries: any[];
   addSummary: (summary: any) => void;
   dismissSummary: (index: number) => void;
+
+  /* WhatsApp Auto-handle & Pings */
+  waActivePings: WAPing[];
+  waHandledContacts: string[];
+  addPing: (ping: WAPing) => void;
+  removePing: (ping_id: string) => void;
+  addHandledContact: (contact_id: string) => void;
+  removeHandledContact: (contact_id: string) => void;
+
+  /* Global WebSocket Send */
+  socketSend: ((msg: string) => void) | null;
+  setSocketSend: (sendFn: ((msg: string) => void) | null) => void;
 }
 
 /* ── Helpers ── */
@@ -153,4 +173,28 @@ export const useMetherStore = create<MetherState>((set) => ({
   dismissSummary: (index) => set((state) => ({
     summaries: state.summaries.filter((_, i) => i !== index)
   })),
+
+  /* WhatsApp Pings */
+  waActivePings: [],
+  waHandledContacts: [],
+  addPing: (ping) =>
+    set((state) => ({ waActivePings: [...state.waActivePings, ping] })),
+  removePing: (ping_id) =>
+    set((state) => ({
+      waActivePings: state.waActivePings.filter((p) => p.ping_id !== ping_id),
+    })),
+  addHandledContact: (contact_id) =>
+    set((state) => ({
+      waHandledContacts: state.waHandledContacts.includes(contact_id)
+        ? state.waHandledContacts
+        : [...state.waHandledContacts, contact_id],
+    })),
+  removeHandledContact: (contact_id) =>
+    set((state) => ({
+      waHandledContacts: state.waHandledContacts.filter((id) => id !== contact_id),
+    })),
+
+  /* WebSocket send */
+  socketSend: null,
+  setSocketSend: (sendFn) => set({ socketSend: sendFn }),
 }));

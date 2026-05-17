@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
+import time
 import structlog
 from fastapi import WebSocket, WebSocketDisconnect
 
 from mether.agent.agent import METHERAgent
 from mether.events.bus import EventBus
+from mether.tools.whatsapp import HANDLED_CONTACTS
 
 logger = structlog.get_logger(__name__)
 
@@ -120,6 +123,52 @@ async def websocket_endpoint(
 
             elif msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
+
+            elif msg_type == "handle_start":
+                contact_id = data.get("contact_id")
+                contact_name = data.get("contact_name") or contact_id
+                ping_id = data.get("ping_id")
+                
+                logger.info(f"Starting auto-handle for {contact_name} ({contact_id}) via ping")
+                
+                # Fetch recent messages
+                intro_msg = "Hey! Mayank's not available rn, I'm his AI assistant. I'll pass the message along, but is there anything I can help with?"
+                
+                try:
+                    async with httpx.AsyncClient() as client:
+                        # Add to handled contacts
+                        HANDLED_CONTACTS[contact_id] = {
+                            "name": contact_name,
+                            "start_time": time.time(),
+                            "last_activity": time.time(),
+                            "messages": []
+                        }
+                        
+                        resp = await client.get(f"http://localhost:3001/messages/{contact_id}")
+                        if resp.status_code == 200:
+                            msgs = resp.json().get("messages", [])
+                            # Limit to last 3 msgs for context
+                            for m in msgs[-3:]:
+                                role = "assistant" if m.get("fromMe") else "user"
+                                HANDLED_CONTACTS[contact_id]["messages"].append({"role": role, "content": m.get("body", "")})
+                        
+                        # Send the introductory reply
+                        HANDLED_CONTACTS[contact_id]["messages"].append({"role": "assistant", "content": intro_msg})
+                        await client.post("http://localhost:3001/send", json={"to": contact_id, "message": intro_msg})
+                except Exception as e:
+                    logger.error(f"Failed to start auto-handle: {e}")
+                
+                await bus.emit("whatsapp.handle_started", {"contact": contact_name})
+                await websocket.send_json({"type": "wa_ping_resolved", "ping_id": ping_id})
+                await websocket.send_json({
+                    "type": "log",
+                    "module": "WA",
+                    "message": f"Now handling {contact_name}"
+                })
+
+            elif msg_type == "ping_dismissed":
+                ping_id = data.get("ping_id")
+                await websocket.send_json({"type": "wa_ping_resolved", "ping_id": ping_id})
 
             else:
                 await websocket.send_json(

@@ -6,11 +6,13 @@ from typing import Any
 
 from fastapi import APIRouter, Request, BackgroundTasks
 import httpx
+import asyncio
 from mether.agent.agent import METHERAgent
 from mether.events.bus import EventBus
 import structlog
 import time
 from mether.tools.whatsapp import HANDLED_CONTACTS
+from mether.utils.whatsapp_formatter import format_for_whatsapp
 
 router = APIRouter(tags=["mether"])
 
@@ -77,39 +79,68 @@ async def whatsapp_event(request: Request):
             hc["last_activity"] = time.time()
             hc["messages"].append({"role": "user", "content": data.get("body", "")})
             
-            system_prompt = """You are handling WhatsApp messages on behalf of Mayank Sharma.
-Mayank is currently not available. You are his personal AI assistant.
+            system_prompt = """You are texting on WhatsApp on behalf of Mayank Sharma (22, CS student, India).
+Mayank is busy rn. You're replying as him — not as an AI, not as an assistant.
 
-Rules:
-- For the FIRST message in a conversation, introduce yourself:
-  "Hey! Mayank's not available rn, I'm his AI assistant. I'll pass along your message and help if I can 🙏"
-- For subsequent messages: just reply naturally and helpfully
-- Keep track of conversation context
-- If someone asks something you can't handle, say Mayank will get back to them
-- Match Mayank's casual tone (Hinglish is fine)
-- Do NOT sound like an AI assistant from a company
-- Sound like a real person helping a friend"""
+CRITICAL RULES — follow these EXACTLY:
+- Write like a 22-year-old Indian CS student would text on WhatsApp
+- Use Hinglish naturally (bhai, yaar, chill, haan, nahi, kya, etc.)
+- Short sentences. Keep it brief. No essays.
+- NEVER use bullet points or numbered lists
+- NEVER start with 'Sure' or 'Certainly' or 'Great question' or 'Absolutely'
+- NEVER say 'As an AI' or 'I'm an AI assistant' or similar
+- If first message: briefly mention Mayank's busy, you're helping out
+- For code questions: paste code plainly, say 'yeh try karo' or 'try this'
+- For casual chat: just vibe naturally, use 'lol' 'haha' 'ok' 'acha' where natural
+- If you can't help: say Mayank will reply later, don't over-apologize
+- Match the energy of the person you're talking to
+- Typos are fine occasionally (but never in code)
+- NO markdown. NO bold. NO italics. NO headers. Just plain text."""
 
             llm = request.app.state.llm
             ctx_msgs = hc["messages"][-5:]
             try:
                 llm_response = await llm.chat(messages=ctx_msgs, system=system_prompt)
                 content = llm_response.get("content", [])
-                llm_reply = content[0].get("text", "") if content else "..."
+                llm_reply_raw = content[0].get("text", "") if content else "..."
             except Exception as e:
                 logger.error(f"Auto-reply LLM error: {e}")
-                llm_reply = "Hey, Mayank's AI here — I ran into a small error processing your message!"
+                llm_reply_raw = "Hey, Mayank's busy rn — he'll get back to you soon!"
+
+            # Post-process through the formatter to strip any remaining AI-isms
+            formatted = format_for_whatsapp(llm_reply_raw)
+            
+            # Send as single or multi-message
+            async with httpx.AsyncClient() as client:
+                if isinstance(formatted, list):
+                    for i, msg_part in enumerate(formatted):
+                        if i > 0:
+                            await asyncio.sleep(1.5)
+                        await client.post("http://localhost:3001/send", json={"to": matched_id, "message": msg_part})
+                    llm_reply = "\n".join(formatted)
+                else:
+                    await client.post("http://localhost:3001/send", json={"to": matched_id, "message": formatted})
+                    llm_reply = formatted
 
             hc["messages"].append({"role": "assistant", "content": llm_reply})
-            
-            async with httpx.AsyncClient() as client:
-                await client.post("http://localhost:3001/send", json={"to": matched_id, "message": llm_reply})
             
             await bus.emit("ws.send", {
                 "type": "whatsapp_auto_reply", 
                 "to": data.get("fromName"), 
                 "message": llm_reply, 
                 "original": data.get("body")
+            })
+        else:
+            # Emit wa_ping for unhandled messages
+            import uuid
+            ping_id = str(uuid.uuid4())
+            await bus.emit("ws.send", {
+                "type": "wa_ping",
+                "contact_id": contact_id,
+                "contact_name": data.get("fromName") or contact_id,
+                "preview": data.get("body", "")[:60],
+                "timestamp": data.get("timestamp", int(time.time())),
+                "ping_id": ping_id
             })
 
         # Forward message to the frontend and log

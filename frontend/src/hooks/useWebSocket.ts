@@ -29,6 +29,9 @@ export function useWebSocket(): WebSocketHook {
     setActiveTool,
     setActiveResponse,
     addSummary,
+    addPing,
+    removePing,
+    setSocketSend,
   } = useMetherStore();
 
   const isConnected = connectionStatus === "connected";
@@ -161,11 +164,25 @@ export function useWebSocket(): WebSocketHook {
           addSummary(msg);
           break;
 
+        case "wa_ping":
+          addPing({
+            ping_id: msg.ping_id,
+            contact_id: msg.contact_id,
+            contact_name: msg.contact_name,
+            preview: msg.preview,
+            timestamp: msg.timestamp,
+          });
+          break;
+
+        case "wa_ping_resolved":
+          removePing(msg.ping_id);
+          break;
+
         default:
           addLog("WS", `Unknown message type: ${msg.type}`);
       }
     },
-    [addLog, setOrbState, setActiveTool, incrementStat, setActiveResponse]
+    [addLog, setOrbState, setActiveTool, incrementStat, setActiveResponse, addSummary, addPing, removePing]
   );
 
   const scheduleReconnect = useCallback(() => {
@@ -207,6 +224,14 @@ export function useWebSocket(): WebSocketHook {
       }
     };
   }, [connect]);
+
+  // Expose send to global store so other components don't have to duplicate connection
+  useEffect(() => {
+    setSocketSend(send);
+    return () => {
+      setSocketSend(null);
+    };
+  }, [send, setSocketSend]);
 
   return {
     isConnected,

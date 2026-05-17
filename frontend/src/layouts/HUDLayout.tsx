@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useClock } from "@/hooks/useClock";
 import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";
+import { WhatsAppPing } from "@/components/WhatsAppPing/WhatsAppPing";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — HUD Layout Shell
@@ -267,6 +268,8 @@ export default function HUDLayout({
 
       {/* ── Center viewport ── */}
       <CenterViewport>{children}</CenterViewport>
+
+      <WhatsAppPing />
     </div>
   );
 }

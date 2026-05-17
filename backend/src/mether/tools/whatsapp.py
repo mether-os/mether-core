@@ -1,6 +1,9 @@
 import httpx
+import asyncio
 from typing import Any, Dict
 import time
+
+from mether.utils.whatsapp_formatter import format_for_whatsapp
 
 HANDLED_CONTACTS = {}
 
@@ -80,12 +83,27 @@ class WhatsAppTool(BaseTool):
                             to_param = resolved["id"]
                             resolved_name = resolved["name"]
                     
-                    resp = await client.post(f"{base}/send", json={
-                        "to": to_param,
-                        "message": kwargs["message"]
-                    })
-                    resp.raise_for_status()
-                    result_data = resp.json()
+                    raw_message = kwargs["message"]
+                    formatted = format_for_whatsapp(raw_message)
+                    
+                    # Multi-message (code replies) — send each part with delay
+                    if isinstance(formatted, list):
+                        for i, msg_part in enumerate(formatted):
+                            if i > 0:
+                                await asyncio.sleep(1.5)
+                            await client.post(f"{base}/send", json={
+                                "to": to_param,
+                                "message": msg_part
+                            })
+                        result_data = {"success": True, "to": to_param, "messages_sent": len(formatted)}
+                    else:
+                        resp = await client.post(f"{base}/send", json={
+                            "to": to_param,
+                            "message": formatted
+                        })
+                        resp.raise_for_status()
+                        result_data = resp.json()
+                    
                     if resolved_name:
                         result_data["resolved_name"] = resolved_name
                         result_data["resolved_number"] = to_param
