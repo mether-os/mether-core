@@ -71,6 +71,7 @@ export function useWebSocket(): WebSocketHook {
           }
           break;
         case "log": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           if (payload.module && payload.message) {
             addLog(payload.module, payload.message);
@@ -93,6 +94,7 @@ export function useWebSocket(): WebSocketHook {
         case "agent.thinking":
           break;
         case "tool.start": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           if (payload.data && payload.data.tool) {
             setActiveTool(payload.data.tool);
@@ -101,6 +103,7 @@ export function useWebSocket(): WebSocketHook {
           break;
         }
         case "tool.done": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           if (payload.data && payload.data.tool) {
             addLog("TOOL", `Done: ${payload.data.tool}`);
@@ -135,6 +138,7 @@ export function useWebSocket(): WebSocketHook {
           addSummary(msg);
           break;
         case "wa_ping": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           addPing({
             ping_id: payload.ping_id,
@@ -146,11 +150,13 @@ export function useWebSocket(): WebSocketHook {
           break;
         }
         case "wa_ping_resolved": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           removePing(payload.ping_id);
           break;
         }
         case "confirm_required": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           useMetherStore.getState().setPendingConfirmation({
             action_id: payload.action_id,
@@ -161,6 +167,7 @@ export function useWebSocket(): WebSocketHook {
           break;
         }
         case "action_cancelled": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           const current = useMetherStore.getState().pendingConfirmation;
           if (current?.action_id === payload.action_id) {
@@ -169,6 +176,7 @@ export function useWebSocket(): WebSocketHook {
           break;
         }
         case "terminal_line": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           if (payload.line !== undefined) {
             const store = useMetherStore.getState();
@@ -182,6 +190,7 @@ export function useWebSocket(): WebSocketHook {
           break;
         }
         case "terminal_exit": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const payload = msg as any;
           useMetherStore.getState().setTerminalProcessExit(payload.returncode);
           break;
