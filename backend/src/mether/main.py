@@ -20,6 +20,7 @@ from mether.events.bus import EventBus
 from mether.memory.context import ContextMemory
 from mether.tools.registry import ToolRegistry
 from mether.tools.system import SystemTool
+from mether.tools.whatsapp import WhatsAppTool
 
 
 import logging as _stdlib_logging
@@ -77,6 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # 6. Init ToolRegistry + register built-in tools
     tools = ToolRegistry()
     tools.register(SystemTool())
+    tools.register(WhatsAppTool())
 
     # 7. Init METHERAgent
     agent = METHERAgent(llm=llm, tools=tools, memory=memory, bus=bus)

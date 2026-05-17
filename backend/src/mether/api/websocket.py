@@ -67,10 +67,23 @@ async def websocket_endpoint(
             await websocket.send_json({"type": "tool.done", "data": data})
         except Exception:
             pass
+            
+    async def _forward_whatsapp(data: Any) -> None:
+        try:
+            await websocket.send_json({
+                "type": "whatsapp_message",
+                "from": data.get("fromName"),
+                "body": data.get("body"),
+                "isGroup": data.get("isGroup"),
+                "groupName": data.get("groupName")
+            })
+        except Exception:
+            pass
 
     await bus.subscribe("agent.thinking", _forward_thinking)
     await bus.subscribe("tool.start", _forward_tool_start)
     await bus.subscribe("tool.done", _forward_tool_done)
+    await bus.subscribe("whatsapp.message", _forward_whatsapp)
 
     # ------- Main receive loop -------------------------------------------
     try:
