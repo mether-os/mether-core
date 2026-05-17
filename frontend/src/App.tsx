@@ -1,5 +1,6 @@
 import HUDLayout from "@/layouts/HUDLayout";
 import { VoiceOrb } from "@/components/VoiceOrb";
+import LeftPanel from "@/components/panels/LeftPanel";
 import { useOrbState } from "@/hooks/useOrbState";
 
 /**
@@ -12,7 +13,7 @@ function App() {
   const { state, toggle } = useOrbState(true);
 
   return (
-    <HUDLayout>
+    <HUDLayout leftPanel={<LeftPanel />}>
       <VoiceOrb state={state} onActivate={toggle} />
     </HUDLayout>
   );
