@@ -52,7 +52,7 @@ class AppLaunchTool(BaseTool):
         try:
             if platform.system() == "Windows":
                 if os.path.exists(cmd):
-                    os.startfile(cmd)
+                    os.startfile(cmd)  # type: ignore[attr-defined]
                 else:
                     subprocess.Popen(f"start {cmd}", shell=True)
             else:
