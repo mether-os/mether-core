@@ -1,44 +1,43 @@
-import "./index.css";
+import HUDLayout from "@/layouts/HUDLayout";
 
 /**
  * METHER OS — Root Application Shell
  *
- * This is the entry point for the tactical HUD interface.
- * All panel layouts, routing, and global overlays will mount here.
+ * Wraps the HUD layout and renders the central viewport content.
+ * Voice Orb, modal overlays, and route content will mount here.
  */
 function App() {
   return (
-    <div
-      id="mether-root"
-      className="relative min-h-screen bg-void hud-grid scan-line-overlay noise-overlay"
-    >
-      {/* System status bar will go here */}
-
-      {/* Main viewport — panels mount inside */}
-      <main className="relative z-10 flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-4 animate-fade-in">
-          {/* Boot identifier */}
-          <p className="hud-label tracking-[0.25em] text-on-surface-variant">
-            :: SYSTEM INIT
-          </p>
-
-          {/* Wordmark */}
-          <h1 className="text-headline-xl text-primary text-glow-cyan">
-            METHER OS
-          </h1>
-
-          {/* Status */}
-          <p className="text-data-mono text-outline">
-            v0.1.0 &middot; TACTICAL INTELLIGENCE INTERFACE &middot; STANDBY
-          </p>
-
-          {/* Boot chip */}
-          <div className="flex justify-center pt-2">
-            <span className="hud-chip hud-chip--success">ONLINE</span>
+    <HUDLayout>
+      {/* Center placeholder — Voice Orb will mount here */}
+      <div className="flex flex-col items-center gap-4 animate-fade-in select-none">
+        {/* Orb placeholder ring */}
+        <div className="relative flex items-center justify-center">
+          {/* Outer ring */}
+          <div
+            className="absolute w-40 h-40 rounded-full border border-primary/20 animate-ring-spin"
+            style={{ borderStyle: "dashed" }}
+          />
+          {/* Middle ring */}
+          <div
+            className="absolute w-28 h-28 rounded-full border border-primary/15 animate-ring-spin-reverse"
+            style={{ borderStyle: "dashed" }}
+          />
+          {/* Inner core glow */}
+          <div className="w-16 h-16 rounded-full bg-primary/10 animate-breathe flex items-center justify-center">
+            <div className="w-6 h-6 rounded-full bg-primary/30 animate-pulse-glow" />
           </div>
         </div>
-      </main>
-    </div>
+
+        {/* Status text */}
+        <p className="hud-label tracking-[0.25em] text-on-surface-variant mt-2">
+          :: VOICE ORB STANDBY
+        </p>
+        <p className="text-data-mono text-outline">
+          AWAITING ACTIVATION
+        </p>
+      </div>
+    </HUDLayout>
   );
 }
 
