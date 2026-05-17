@@ -62,12 +62,28 @@ async def websocket_endpoint(
     async def _forward_tool_start(data: Any) -> None:
         try:
             await websocket.send_json({"type": "tool.start", "data": data})
+            tool_name = data.get("tool")
+            mod_map = {"gmail": "GMAIL", "calendar": "CAL", "drive": "DRIVE"}
+            if tool_name in mod_map:
+                await websocket.send_json({
+                    "type": "log",
+                    "module": mod_map[tool_name],
+                    "message": f"Executing {tool_name}..."
+                })
         except Exception:
             pass
 
     async def _forward_tool_done(data: Any) -> None:
         try:
             await websocket.send_json({"type": "tool.done", "data": data})
+            tool_name = data.get("tool")
+            mod_map = {"gmail": "GMAIL", "calendar": "CAL", "drive": "DRIVE"}
+            if tool_name in mod_map:
+                await websocket.send_json({
+                    "type": "log",
+                    "module": mod_map[tool_name],
+                    "message": f"Completed {tool_name}"
+                })
         except Exception:
             pass
             

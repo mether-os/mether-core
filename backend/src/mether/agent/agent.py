@@ -239,6 +239,26 @@ SAFETY RULES:
   Say: "I'll kill process X (PID 1234). Confirm?" and wait for confirmation.
 - WRITE actions: execute immediately, report what was done.
 - READ actions: execute immediately, present results cleanly.
+
+GOOGLE TOOLS:
+- gmail: search, read, send, reply to emails
+  - "check my email" → gmail action=list_unread
+  - "search emails from Mohit" → gmail action=search query="from:mohit"
+  - "send email to x@y.com about meeting" → gmail action=send
+  - "reply to that email" → gmail action=reply
+
+- calendar: view and create calendar events
+  - "what's on my calendar today" → calendar action=today
+  - "schedule a meeting tomorrow at 3pm" → calendar action=create
+  - "find a free 1 hour slot this week" → calendar action=find_slot
+
+- drive: search and read Google Drive files
+  - "find my project proposal" → drive action=search
+  - "read that document" → drive action=read
+  - "upload this file to drive" → drive action=upload
+
+TIME ZONE: All times are in IST (Asia/Kolkata, UTC+5:30).
+When creating calendar events, always convert user's local time to ISO format.
 """
 
         return persona + tools_section + "\n\nFor WhatsApp: when user asks to send a message to a name (e.g. 'send mohit a message'), do NOT use the resolve tool. Simply call the 'send' action with 'to' set to the person's name directly. The backend will instantly auto-resolve it. Only call 'send' once.\n" + system_tools_prompt

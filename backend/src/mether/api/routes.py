@@ -213,3 +213,49 @@ async def voice_event(request: Request):
         await bus.emit("ws.send", {"type": "orb_state", "state": "idle"})
         
     return {"success": True}
+
+@router.get("/google/status")
+async def google_status(request: Request) -> dict[str, Any]:
+    from mether.tools.google.auth import GoogleAuth
+    config = request.app.state.config
+    auth = GoogleAuth(config.google_credentials_path, config.google_token_path)
+    if not auth.is_authenticated():
+        return {"authenticated": False}
+    
+    try:
+        from googleapiclient.discovery import build
+        service = build("gmail", "v1", credentials=auth.get_credentials())
+        profile = service.users().getProfile(userId="me").execute()
+        email = profile.get("emailAddress")
+    except Exception:
+        email = None
+        
+    return {
+        "authenticated": True,
+        "email": email,
+        "scopes": getattr(auth.get_credentials(), "scopes", []),
+        "token_expires": str(getattr(auth.get_credentials(), "expiry", None))
+    }
+
+@router.get("/google/auth")
+async def google_auth_endpoint(request: Request) -> dict[str, Any]:
+    from mether.tools.google.auth import GoogleAuth
+    config = request.app.state.config
+    auth = GoogleAuth(config.google_credentials_path, config.google_token_path)
+    if auth.is_authenticated():
+        return {"authenticated": True, "message": "Already logged in"}
+    
+    try:
+        creds = auth.get_credentials()
+        return {"authenticated": True, "email": "Connected"}
+    except Exception as e:
+        return {"authenticated": False, "error": str(e)}
+
+@router.get("/google/logout")
+async def google_logout(request: Request) -> dict[str, Any]:
+    from mether.tools.google.auth import GoogleAuth
+    config = request.app.state.config
+    auth = GoogleAuth(config.google_credentials_path, config.google_token_path)
+    if auth.token_path.exists():
+        auth.token_path.unlink()
+    return {"logged_out": True}

@@ -43,6 +43,9 @@ const MODULE_COLORS: Record<string, string> = {
   METHER: "text-primary-fixed",
   WA: "text-success",
   WA_AUTO: "text-success opacity-80",
+  GMAIL: "text-blue-400",
+  CAL: "text-green-400",
+  DRIVE: "text-purple-400",
 };
 
 /* ── Helpers ── */

@@ -24,6 +24,10 @@ from mether.tools.whatsapp import WhatsAppTool, HANDLED_CONTACTS
 from mether.tools.system_control import (
     AppLaunchTool, CodeRunTool, FileSystemTool, ProcessTool, ClipboardTool, ScreenshotTool
 )
+from mether.tools.google.auth import GoogleAuth
+from mether.tools.google.gmail import GmailTool
+from mether.tools.google.calendar import CalendarTool
+from mether.tools.google.drive import DriveTool
 import asyncio
 import time
 
@@ -127,6 +131,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tools.register(ProcessTool())
     tools.register(ClipboardTool())
     tools.register(ScreenshotTool())
+
+    google_auth = GoogleAuth(
+      credentials_path=config.google_credentials_path,
+      token_path=config.google_token_path
+    )
+
+    if google_auth.credentials_path.exists():
+      tools.register(GmailTool(google_auth))
+      tools.register(CalendarTool(google_auth))
+      tools.register(DriveTool(google_auth))
+      log.info("google_tools_registered", tools=["gmail", "calendar", "drive"])
+    else:
+      log.warning("google_credentials_missing",
+        path=str(google_auth.credentials_path),
+        message="Download from Google Cloud Console to enable Google tools"
+      )
 
     # 7. Init METHERAgent
     agent = METHERAgent(llm=llm, tools=tools, memory=memory, bus=bus)

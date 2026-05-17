@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # --- Logging ------------------------------------------------------------
     log_level: str = "INFO"
 
+    # --- Google Integration -------------------------------------------------
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_token_path: str = "~/.mether/google_token.json"
+    google_credentials_path: str = "~/.mether/google_credentials.json"
+
     # --- Derived helpers ----------------------------------------------------
     @property
     def claude_md_resolved(self) -> Path:

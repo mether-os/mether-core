@@ -369,11 +369,95 @@ function StatRow({
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   SECTION 4 — Google Services
+   ═══════════════════════════════════════════════════════════════ */
+
+function GoogleServices() {
+  const [status, setStatus] = useState<any>(null);
+
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch("http://localhost:8000/google/status");
+      const data = await res.json();
+      setStatus(data);
+    } catch (e) {
+      setStatus({ authenticated: false });
+    }
+  };
+
+  useEffect(() => {
+    fetchStatus();
+    const id = setInterval(fetchStatus, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleConnect = async () => {
+    try {
+      await fetch("http://localhost:8000/google/auth");
+      setTimeout(fetchStatus, 3000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  if (!status) return null;
+
+  if (!status.authenticated) {
+    return (
+      <div className="shrink-0">
+        <SectionHeader title="GOOGLE SERVICES" />
+        <div className="flex items-center justify-between py-[5px]">
+          <div className="flex items-center gap-1.5 min-w-[60px]">
+            <span className="inline-block w-[5px] h-[5px] rounded-full bg-outline-variant/50" />
+            <span className="hud-label">GOOGLE</span>
+          </div>
+          <span className="text-data-mono text-outline-variant text-[9px]">[○ OFFLINE]</span>
+          <button 
+            onClick={handleConnect}
+            className="hud-chip hud-chip--warning text-[8px] cursor-pointer hover:bg-warning/20"
+          >
+            CONNECT
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const renderService = (name: string, active: boolean) => (
+    <div className="flex items-center justify-between py-[5px]">
+      <div className="flex items-center gap-1.5 min-w-[60px]">
+        <span className={`inline-block w-[5px] h-[5px] rounded-full ${active ? "bg-primary" : "bg-outline-variant/50"}`} />
+        <span className="hud-label uppercase">{name}</span>
+      </div>
+      <span className={`text-data-mono text-[9px] ${active ? "text-primary" : "text-outline-variant"}`}>
+        [{active ? "● ACTIVE" : "○ OFFLINE"}]
+      </span>
+      {name === "GMAIL" && status.email && (
+        <span className="text-[9px] text-on-surface-variant max-w-[80px] truncate ml-2">
+          {status.email}
+        </span>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="shrink-0">
+      <SectionHeader title="GOOGLE SERVICES" />
+      <div className="flex flex-col divide-y divide-primary/[0.08]">
+        {renderService("GMAIL", true)}
+        {renderService("CALENDAR", true)}
+        {renderService("DRIVE", true)}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    RIGHT PANEL — Main Export
    ═══════════════════════════════════════════════════════════════ */
 export default function RightPanel() {
   return (
-    <div className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container">
+    <div className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container overflow-y-auto" style={{ scrollbarWidth: "none" }}>
       {/* Extra corners (top-right + bottom-left) */}
       <span className="hud-corner-bracket--extra absolute inset-0 pointer-events-none" />
 
@@ -391,6 +475,12 @@ export default function RightPanel() {
 
       {/* Section 3 — Voice Pipeline (~30%) */}
       <VoicePipeline />
+
+      {/* Divider */}
+      <div className="my-2 h-px bg-primary/15 shrink-0" />
+
+      {/* Section 4 — Google Services */}
+      <GoogleServices />
     </div>
   );
 }
