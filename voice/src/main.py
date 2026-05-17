@@ -80,12 +80,41 @@ async def main():
     # ── Notify backend ────────────────────────────────────────
     await mether.notify("voice.online", {"status": "listening"})
 
+    # ── Background TTS speaker for typed chat responses ───────
+    # When the user types in the frontend, the backend sends a
+    # "speak" message over the voice WebSocket.  This task picks
+    # those up and plays them through Piper so you hear every
+    # response, not just voice-triggered ones.
+    async def _speak_from_queue():
+        while True:
+            try:
+                msg = await mether.msg_queue.get()
+                if msg.get("type") == "speak":
+                    text_to_speak = msg.get("text", "")
+                    if not text_to_speak:
+                        continue
+                    print(f"[METHER-VOICE] 🔊 Speaking (from chat): \"{text_to_speak[:80]}{'...' if len(text_to_speak) > 80 else ''}\"")
+                    try:
+                        audio_data, rate = tts.speak(text_to_speak)
+                        player.play(audio_data, rate)
+                        print("[METHER-VOICE] ✅ Chat TTS done")
+                    except Exception as e:
+                        print(f"[METHER-VOICE] ⚠️  Chat TTS error: {e}")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"[METHER-VOICE] ⚠️  Queue listener error: {e}")
+                await asyncio.sleep(0.5)
+
+    speak_task = asyncio.create_task(_speak_from_queue())
+
     # ── Start mic capture ─────────────────────────────────────
     capture.start()
     print()
     print("[METHER-VOICE] ══════════════════════════════════════════")
     print("[METHER-VOICE]  🎤  Listening for wake word...  Say:")
     print(f"[METHER-VOICE]      \"{wake_word}\"")
+    print("[METHER-VOICE]  💬  Typed chat responses will also be spoken!")
     print("[METHER-VOICE] ══════════════════════════════════════════")
     print()
 
@@ -96,7 +125,7 @@ async def main():
         while True:
             # ── SLEEPING: detect wake word ────────────────────
             if state == "sleeping":
-                chunk = capture.read(seconds=0.5)
+                chunk = await asyncio.to_thread(capture.read, 0.5)
 
                 if wake.check(chunk):
                     print()
@@ -110,13 +139,13 @@ async def main():
 
             # ── LISTENING: capture speech ─────────────────────
             elif state == "listening":
-                audio = capture.read(seconds=5)
+                audio = await asyncio.to_thread(capture.read, 5.0)
                 state = "processing"
                 await mether.notify("voice.listening_done", {})
 
                 # Transcribe
                 print("[METHER-VOICE] 🔄 Transcribing...")
-                text = stt.transcribe(audio)
+                text = await asyncio.to_thread(stt.transcribe, audio)
 
                 if not text or len(text.strip()) < 2:
                     print("[METHER-VOICE] ❌ No speech detected — back to sleep")
@@ -143,8 +172,8 @@ async def main():
                 await mether.notify("voice.speaking", {})
 
                 try:
-                    audio_data, rate = tts.speak(response)
-                    player.play(audio_data, rate)
+                    audio_data, rate = await asyncio.to_thread(tts.speak, response)
+                    await asyncio.to_thread(player.play, audio_data, rate)
                 except Exception as e:
                     print(f"[METHER-VOICE] ⚠️  TTS error: {e}")
                     print(f"[METHER-VOICE]    (text response): {response}")
@@ -159,6 +188,7 @@ async def main():
     except KeyboardInterrupt:
         print("\n[METHER-VOICE] Shutting down...")
     finally:
+        speak_task.cancel()
         capture.stop()
         await mether.notify("voice.offline", {"status": "shutdown"})
         print("[METHER-VOICE] Goodbye.")

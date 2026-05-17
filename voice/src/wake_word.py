@@ -11,8 +11,7 @@ class WakeWordDetector:
         # openWakeWord uses underscore-separated, lowercase model names
         self.wake_word = wake_word.replace(" ", "_").lower()
         self.model = Model(
-            wakeword_models=[self.wake_word],
-            inference_framework="onnx",
+            wakeword_models=[self.wake_word]
         )
         self.threshold = 0.5
 

@@ -117,6 +117,9 @@ async def websocket_endpoint(
                 # Process through the agent (may involve tool calls).
                 response = await agent.process(text)
 
+                # Broadcast to voice sidecar so it speaks the text too
+                await bus.emit("voice.speak", {"text": response})
+
                 # Send response and reset orb state to idle
                 await websocket.send_json({"type": "response", "text": response})
                 await websocket.send_json({"type": "orb_state", "state": "idle"})
@@ -200,6 +203,17 @@ async def voice_ws(websocket: WebSocket):
     bus = app.state.bus
     agent = app.state.agent
     
+    async def _forward_speak(data: Any) -> None:
+        try:
+            await websocket.send_json({
+                "type": "speak",
+                "text": data.get("text")
+            })
+        except Exception:
+            pass
+
+    await bus.subscribe("voice.speak", _forward_speak)
+
     try:
         while True:
             data = await websocket.receive_json()
@@ -240,3 +254,5 @@ async def voice_ws(websocket: WebSocket):
         logger.info("Voice sidecar disconnected")
         await bus.emit("ws.send", {"type": "log", "module": "VOICE", "message": "Pipeline disconnected"})
         await bus.emit("ws.send", {"type": "voice_status", "status": "offline"})
+    finally:
+        await bus.unsubscribe("voice.speak", _forward_speak)
