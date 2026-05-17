@@ -1,105 +1,147 @@
 # METHER OS
 
-METHER OS is a personalized, agentic AI operating system featuring a highly stylized, cinematic "HUD" interface. It is designed to be a modular assistant architecture supporting real-time streaming, automation, tool execution, and dynamic agent orchestration.
+> Personal AI Operating System — Jarvis-style voice + WhatsApp + system control.
 
-## 🚀 Current Features
-
-- **Cinematic HUD Interface:** A React-based tactical dashboard featuring dynamic system vitals, a central VoiceOrb, and a unified real-time agent log.
-- **Bi-Directional WebSocket Flow:** Fully decoupled, asynchronous communication between the frontend and backend, delivering zero-blocking, real-time UI updates.
-- **Agent Orchestration:** Powered by an async Python backend utilizing `FastAPI` and `httpx`.
-- **Advanced Streaming Parser:** Automatically detects and parses Server-Sent Events (SSE) from Anthropic-compatible endpoints, rendering responses with a typewriter effect directly above the command interface.
-- **Tool Registry Framework:** Currently implements a `SystemTool` for reading live hardware metrics (CPU, RAM, Uptime), ready to be expanded.
-- **Optimized for NVIDIA Nemotron:** Currently configured to route requests to the lightning-fast **NVIDIA Nemotron 3 Super** (120b) model via NVIDIA NIM APIs.
-- **Voice Pipeline:** Browser-based Web Speech API for real-time Text-to-Speech (TTS), and a dedicated Python voice sidecar utilizing `openwakeword` for precise wake word detection.
-- **WhatsApp Integration:** Dedicated Node.js sidecar using `whatsapp-web.js` to send/receive messages and bridge communication directly into METHER OS.
-
-## 🛠 Tech Stack
-
-**Frontend:**
-- React 19 + TypeScript + Vite
-- TailwindCSS (Custom HUD theming)
-- Zustand (Global State Management)
-
-**Backend:**
-- Python 3.11+
-- FastAPI + Uvicorn
-- Asyncio + Structlog
-- Pydantic v2
-
-**Voice Sidecar:**
-- Python 3.11+
-- `openwakeword` (Wake word detection)
-- `sounddevice` / `pyaudio`
-
-**WhatsApp Sidecar:**
-- Node.js
-- `whatsapp-web.js` (Puppeteer-based web automation)
-- `express`
+[![Backend CI](https://github.com/mether-os/mether-core/actions/workflows/test-backend.yml/badge.svg)](https://github.com/mether-os/mether-core/actions/workflows/test-backend.yml)
+[![Frontend CI](https://github.com/mether-os/mether-core/actions/workflows/test-frontend.yml/badge.svg)](https://github.com/mether-os/mether-core/actions/workflows/test-frontend.yml)
 
 ---
 
-## ⚙️ How to Run Locally
+## Quick Start
 
-You will need five terminal windows to run the complete METHER OS stack with all features.
-
-### 1. The LLM Proxy
-METHER OS delegates reasoning to an external proxy (e.g., `free-claude-code`).
-Make sure the proxy is running on **port 8082** with the NVIDIA NIM configuration (`ENABLE_MODEL_THINKING=false` for max speed).
+### First Time Setup
 ```bash
-cd ../free-claude-code
-uv run python server.py
+git clone https://github.com/mether-os/mether-core.git
+cd mether-core
+infra\install.bat
 ```
 
-### 2. The Backend
-Start the asynchronous Python server.
+### Daily Use
 ```bash
-cd backend
-pip install -e ".[dev]"
-cp .env.example .env
-
-# Start the server (runs on port 8000)
-uvicorn src.mether.main:app --reload --port 8000
+infra\start.bat
 ```
 
-### 3. The Frontend
-Start the React interface.
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Navigate to `http://localhost:5173` to access the METHER OS interface.
+### PowerShell (Advanced)
+```powershell
+# Start with health checks + monitoring
+powershell -ExecutionPolicy Bypass -File infra\mether.ps1
 
-### 4. The Voice Sidecar
-Start the independent wake word and voice processing pipeline.
-```bash
-cd voice
-pip install -r requirements.txt
-python src/main.py
+# Check status
+powershell -ExecutionPolicy Bypass -File infra\mether.ps1 -Status
+
+# Stop all
+powershell -ExecutionPolicy Bypass -File infra\mether.ps1 -Stop
 ```
 
-### 5. The WhatsApp Bridge (Optional)
-If you want WhatsApp capabilities, start the Node.js sidecar.
+### Auto-Start on Windows Boot
 ```bash
-cd whatsapp
-npm install
-npm run start
+infra\autostart\register_autostart.bat
 ```
-*Note: A QR code will appear in the terminal. Scan it with your phone's WhatsApp app to link the device.*
+
+### Stop Everything
+```bash
+infra\stop.bat
+```
 
 ---
 
-## 📋 Environment Configuration (`backend/.env`)
+## Services
 
-Make sure your backend `.env` file maps correctly to your proxy:
+| Service | Port | Technology | Purpose |
+|---------|------|------------|---------|
+| LLM Proxy | 8082 | Python / uvicorn | Routes to NVIDIA NIM / OpenRouter |
+| Backend | 8000 | FastAPI + WebSocket | Agent core, tools, memory |
+| WhatsApp | 3001 | Node.js / whatsapp-web.js | WhatsApp bridge + auto-reply |
+| Voice | — | Python / Whisper + Piper | Wake word, STT, TTS |
+| Frontend | 5173 | React 19 + Vite | Tactical HUD dashboard |
+
+---
+
+## Architecture
+
+```
+mether-core/
+├── backend/          Python FastAPI — agent, tools, memory, API
+│   └── src/mether/
+│       ├── agent/        LLM client + agent loop
+│       ├── api/          REST + WebSocket endpoints
+│       ├── events/       EventBus pub/sub
+│       ├── memory/       Context memory (CLAUDE.md)
+│       ├── tools/        System, Google, clipboard tools
+│       │   └── google/   Gmail, Calendar, Drive integration
+│       └── main.py       App entrypoint
+├── frontend/         React 19 TypeScript — Tactical HUD
+│   └── src/
+│       ├── components/   VoiceOrb, panels, dialogs
+│       ├── hooks/        useWebSocket, useUptime, useOrbState
+│       ├── layouts/      HUDLayout shell
+│       └── stores/       Zustand global state
+├── voice/            Python voice sidecar
+│   └── src/              Wake word + Whisper STT + Piper TTS
+├── whatsapp/         Node.js WhatsApp bridge
+│   └── src/              whatsapp-web.js + auto-reply engine
+├── infra/            Startup scripts + installer
+│   ├── start.bat         Launch all services (Windows)
+│   ├── stop.bat          Stop all services (Windows)
+│   ├── start.sh          Launch all services (Linux/Mac)
+│   ├── install.bat       First-time setup
+│   ├── mether.ps1        PowerShell advanced launcher
+│   └── autostart/        Windows Task Scheduler registration
+├── docs/             Architecture + design system docs
+└── .github/          CI/CD workflows + templates
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full system design.
+
+---
+
+## Features
+
+- **Voice Control** — Wake word detection → Whisper STT → LLM → Piper TTS
+- **System Tools** — CPU/RAM monitoring, process kill, code execution, clipboard, screenshots
+- **Google Integration** — Gmail search/send, Calendar CRUD, Drive file management
+- **WhatsApp Bridge** — Auto-reply, conversation summaries, ping notifications
+- **Dangerous Action Confirmation** — Visual confirm dialog before destructive operations
+- **Live Terminal** — Streamed command output in the dashboard
+- **Tactical HUD** — Sci-fi dashboard with radar, voice orb, real-time logs
+
+---
+
+## Environment Variables
+
+Copy `.env.example` to `.env` in the backend directory:
 
 ```env
 LLM_PROXY_URL=http://localhost:8082
-LLM_MODEL=nvidia_nim/nvidia/nemotron-3-super-120b-a12b
-ANTHROPIC_AUTH_TOKEN=freecc
+LLM_MODEL=nvidia/llama-3.3-70b-instruct
+ANTHROPIC_AUTH_TOKEN=your_token
+METHER_PORT=8000
+
+# Google (optional)
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+GOOGLE_TOKEN_PATH=~/.mether/google_token.json
+GOOGLE_CREDENTIALS_PATH=~/.mether/google_credentials.json
 ```
 
-## 🏗 Roadmap / Missing Features (Developer Preview)
-- **Advanced Voice Interaction:** Full bi-directional voice streaming, including robust Speech-to-Text (STT) integration to complement the existing wake word and TTS pipeline.
-- **Persistent Memory:** Migrate from static `CLAUDE.md` to dynamic ChromaDB + SQLite vector recall.
-- **Expanded Toolset:** Browser automation, file system access, and native app control.
+---
+
+## Development
+
+```bash
+# Backend (hot reload)
+cd backend && uvicorn src.mether.main:app --reload --port 8000
+
+# Frontend (hot reload)
+cd frontend && npm run dev
+
+# Run tests
+cd backend && pytest tests/ -v
+cd frontend && npm run lint && npm run type-check
+```
+
+---
+
+## License
+
+Private — All rights reserved.
