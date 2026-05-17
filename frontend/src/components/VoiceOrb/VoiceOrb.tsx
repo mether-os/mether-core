@@ -1,5 +1,5 @@
 import { motion, type Variants } from "framer-motion";
-import { useMemo, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Voice Orb
@@ -261,16 +261,22 @@ function Core({
 }
 
 /* ── Waveform bars (listening/speaking state) ── */
+const WAVEFORM_BARS = [
+  { id: 0, delay: 0, baseHeight: 14 },
+  { id: 1, delay: 0.08, baseHeight: 18 },
+  { id: 2, delay: 0.16, baseHeight: 13 },
+  { id: 3, delay: 0.24, baseHeight: 19 },
+  { id: 4, delay: 0.32, baseHeight: 15 },
+  { id: 5, delay: 0.40, baseHeight: 17 },
+  { id: 6, delay: 0.48, baseHeight: 12 },
+  { id: 7, delay: 0.56, baseHeight: 16 },
+];
+
+const WAVEFORM_DURATIONS_SPEAKING = [0.35, 0.42, 0.38, 0.48, 0.33, 0.45, 0.37, 0.41];
+const WAVEFORM_DURATIONS_LISTENING = [0.72, 0.85, 0.68, 0.92, 0.75, 0.88, 0.70, 0.80];
+
 function WaveformBars({ visible, isSpeaking }: { visible: boolean; isSpeaking?: boolean }) {
-  const bars = useMemo(
-    () =>
-      Array.from({ length: 8 }, (_, i) => ({
-        id: i,
-        delay: i * 0.08,
-        baseHeight: 12 + Math.random() * 8,
-      })),
-    []
-  );
+  const bars = WAVEFORM_BARS;
 
   return (
     <motion.div
@@ -307,7 +313,7 @@ function WaveformBars({ visible, isSpeaking }: { visible: boolean; isSpeaking?: 
             transition={
               visible
                 ? {
-                    duration: (isSpeaking ? 0.3 : 0.6) + Math.random() * (isSpeaking ? 0.2 : 0.4),
+                    duration: isSpeaking ? WAVEFORM_DURATIONS_SPEAKING[bar.id] : WAVEFORM_DURATIONS_LISTENING[bar.id],
                     repeat: Infinity,
                     ease: "easeInOut",
                     delay: bar.delay,

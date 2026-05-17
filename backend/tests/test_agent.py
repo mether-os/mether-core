@@ -13,13 +13,14 @@ async def test_agent_handles_llm_failure():
     from mether.events.bus import EventBus
     from mether.tools.registry import ToolRegistry
     from mether.memory.context import ContextMemory
+    from mether.agent.llm import LLMError
     
     bus = EventBus()
     registry = ToolRegistry()
     memory = ContextMemory("/tmp/nonexistent_claude.md")
     
     mock_llm = AsyncMock()
-    mock_llm.chat = AsyncMock(side_effect=Exception("LLM offline"))
+    mock_llm.chat = AsyncMock(side_effect=LLMError("LLM offline"))
     
     agent = METHERAgent(mock_llm, registry, memory, bus)
     result = await agent.process("test message")

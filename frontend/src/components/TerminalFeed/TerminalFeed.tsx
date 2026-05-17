@@ -23,6 +23,7 @@ export function TerminalFeed() {
   // Handle auto-close
   useEffect(() => {
     if (terminalProcessExit !== null && !terminalPinned) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTimeLeft(5);
       const interval = setInterval(() => {
         setTimeLeft((prev) => {

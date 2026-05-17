@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { type ReactNode } from "react";
 import { useClock } from "@/hooks/useClock";
 import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";
@@ -162,6 +162,7 @@ function SidePanel({ side, children }: { side: "left" | "right"; children?: Reac
 
 /* ── Placeholder panel with corner brackets ── */
 function PanelPlaceholder({ label }: { label: string }) {
+  const bars = [80, 65, 90, 70, 85];
   return (
     <div className="hud-panel hud-corner-bracket flex-1 flex flex-col">
       {/* Extra corners (top-right + bottom-left) */}
@@ -175,14 +176,14 @@ function PanelPlaceholder({ label }: { label: string }) {
 
       {/* Placeholder lines — simulated data readout */}
       <div className="flex-1 flex flex-col gap-2">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {bars.map((width, i) => (
           <div key={i} className="flex items-center gap-2">
             <span className="text-data-mono text-outline-variant">
               {String(i + 1).padStart(2, "0")}
             </span>
             <div
               className="h-[3px] bg-primary/10 flex-1"
-              style={{ maxWidth: `${60 + Math.random() * 40}%` }}
+              style={{ maxWidth: `${width}%` }}
             />
           </div>
         ))}

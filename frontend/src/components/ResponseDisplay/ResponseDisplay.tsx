@@ -55,6 +55,7 @@ export default function ResponseDisplay() {
   useEffect(() => {
     if (activeResponse) {
       if (activeResponse.startsWith("[VOICE] ")) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         streamResponse(activeResponse.substring(8));
       } else {
         streamResponse(activeResponse);
@@ -71,6 +72,7 @@ export default function ResponseDisplay() {
       const id = setTimeout(() => setShowCursor(false), 2000);
       return () => clearTimeout(id);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowCursor(true);
   }, [isStreaming, displayText]);
 

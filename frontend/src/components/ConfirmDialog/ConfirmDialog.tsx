@@ -9,9 +9,34 @@ export function ConfirmDialog() {
   const { send } = useWebSocket();
   const [timeLeft, setTimeLeft] = useState(28);
 
+  const handleExecute = () => {
+    if (!pendingConfirmation) return;
+    send(
+      JSON.stringify({
+        type: "confirm_action",
+        action_id: pendingConfirmation.action_id,
+        approved: true,
+      })
+    );
+    setPendingConfirmation(null);
+  };
+
+  const handleCancel = () => {
+    if (!pendingConfirmation) return;
+    send(
+      JSON.stringify({
+        type: "confirm_action",
+        action_id: pendingConfirmation.action_id,
+        approved: false,
+      })
+    );
+    setPendingConfirmation(null);
+  };
+
   useEffect(() => {
     if (!pendingConfirmation) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTimeLeft(28);
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -29,28 +54,6 @@ export function ConfirmDialog() {
   }, [pendingConfirmation]);
 
   if (!pendingConfirmation) return null;
-
-  const handleExecute = () => {
-    send(
-      JSON.stringify({
-        type: "confirm_action",
-        action_id: pendingConfirmation.action_id,
-        approved: true,
-      })
-    );
-    setPendingConfirmation(null);
-  };
-
-  const handleCancel = () => {
-    send(
-      JSON.stringify({
-        type: "confirm_action",
-        action_id: pendingConfirmation.action_id,
-        approved: false,
-      })
-    );
-    setPendingConfirmation(null);
-  };
 
   return (
     <AnimatePresence>

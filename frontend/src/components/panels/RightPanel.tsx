@@ -12,10 +12,7 @@ const RADAR_SIZE = 180;
 const RADAR_CENTER = RADAR_SIZE / 2;
 const SWEEP_DURATION = 3; // seconds per full rotation
 
-/* ── Helpers ── */
-function randomInRange(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+/* ── Helpers (kept for potential future use) ── */
 
 /* ═══════════════════════════════════════════════════════════════
    SECTION HEADER — Reusable panel section title
@@ -69,12 +66,13 @@ function ProximityRadar() {
 
   /* ── Generate blips once ── */
   const blips = useMemo<Blip[]>(() => {
-    return Array.from({ length: 5 }, (_, i) => ({
-      id: i,
-      angle: Math.random() * 360,
-      radius: 0.25 + Math.random() * 0.6,
-      speed: 0.3 + Math.random() * 0.8,
-    }));
+    return [
+      { id: 0, angle: 45, radius: 0.4, speed: 0.5 },
+      { id: 1, angle: 120, radius: 0.7, speed: 0.8 },
+      { id: 2, angle: 210, radius: 0.3, speed: 0.4 },
+      { id: 3, angle: 300, radius: 0.8, speed: 1.1 },
+      { id: 4, angle: 15, radius: 0.6, speed: 0.6 }
+    ];
   }, []);
 
   /* ── Blip drift state ── */
@@ -373,19 +371,20 @@ function StatRow({
    ═══════════════════════════════════════════════════════════════ */
 
 function GoogleServices() {
-  const [status, setStatus] = useState<any>(null);
+  const [status, setStatus] = useState<Record<string, unknown> | null>(null);
 
   const fetchStatus = async () => {
     try {
       const res = await fetch("http://localhost:8000/google/status");
       const data = await res.json();
       setStatus(data);
-    } catch (e) {
+    } catch {
       setStatus({ authenticated: false });
     }
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStatus();
     const id = setInterval(fetchStatus, 30000);
     return () => clearInterval(id);
@@ -395,8 +394,8 @@ function GoogleServices() {
     try {
       await fetch("http://localhost:8000/google/auth");
       setTimeout(fetchStatus, 3000);
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error(err);
     }
   };
 

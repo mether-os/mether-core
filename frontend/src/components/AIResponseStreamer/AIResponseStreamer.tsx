@@ -91,6 +91,7 @@ export default function AIResponseStreamer() {
       const id = setTimeout(() => setShowCursor(false), 2000);
       return () => clearTimeout(id);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowCursor(true);
   }, [isStreaming, displayText]);
 

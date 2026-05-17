@@ -39,7 +39,7 @@ export interface ConfirmRequest {
   action_id: string;
   tool: string;
   description: string;
-  params: any;
+  params: Record<string, unknown>;
 }
 
 export interface TerminalLine {
@@ -94,8 +94,8 @@ interface MetherState {
   setActiveResponse: (res: string | null) => void;
 
   /* WhatsApp Summaries */
-  summaries: any[];
-  addSummary: (summary: any) => void;
+  summaries: Record<string, unknown>[];
+  addSummary: (summary: Record<string, unknown>) => void;
   dismissSummary: (index: number) => void;
 
   /* WhatsApp Auto-handle & Pings */

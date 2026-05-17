@@ -28,6 +28,7 @@ export function useOrbState(initialDemo = true): UseOrbStateReturn {
     const sequence: OrbState[] = ["idle", "listening", "processing", "speaking"];
     let idx = 0;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState(sequence[idx]);
 
     const id = setInterval(() => {
