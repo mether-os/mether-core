@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request, BackgroundTasks
+from fastapi import APIRouter, Request
 import httpx
 import asyncio
-from mether.agent.agent import METHERAgent
-from mether.events.bus import EventBus
 import structlog
 import time
 from mether.tools.whatsapp import HANDLED_CONTACTS
@@ -246,7 +244,7 @@ async def google_auth_endpoint(request: Request) -> dict[str, Any]:
         return {"authenticated": True, "message": "Already logged in"}
     
     try:
-        creds = auth.get_credentials()
+        auth.get_credentials()
         return {"authenticated": True, "email": "Connected"}
     except Exception as e:
         return {"authenticated": False, "error": str(e)}

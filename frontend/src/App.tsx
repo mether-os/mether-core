@@ -69,7 +69,7 @@ function App() {
       // Send over WebSocket (will log locally if offline)
       send(command);
     },
-    [send, addCommand, addLog, incrementStat]
+    [send, addCommand, addLog, incrementStat, setDemo]
   );
 
   return (

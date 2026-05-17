@@ -1,13 +1,12 @@
 import httpx
 import asyncio
-from typing import Any, Dict
+from typing import Any
 import time
 
 from mether.utils.whatsapp_formatter import format_for_whatsapp
-
-HANDLED_CONTACTS = {}
-
 from mether.tools.base import BaseTool, SecurityLevel, ToolResult
+
+HANDLED_CONTACTS: dict[str, Any] = {}
 
 
 class WhatsAppTool(BaseTool):
@@ -76,7 +75,7 @@ class WhatsAppTool(BaseTool):
                     resolved_name = None
                     
                     # If 'to' looks like a name (not just digits and @), try to resolve it first
-                    if not "@" in to_param and not to_param.replace("+", "").isdigit():
+                    if "@" not in to_param and not to_param.replace("+", "").isdigit():
                         res_resp = await client.post(f"{base}/resolve", json={"query": to_param})
                         if res_resp.status_code == 200:
                             resolved = res_resp.json()

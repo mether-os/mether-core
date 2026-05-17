@@ -98,6 +98,8 @@ class CodeRunTool(BaseTool):
             
             output_lines = []
             while True:
+                if process.stdout is None:
+                    break
                 try:
                     line_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=timeout)
                 except asyncio.TimeoutError:

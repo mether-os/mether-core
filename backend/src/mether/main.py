@@ -73,7 +73,8 @@ async def auto_handle_monitor(app: FastAPI):
                 
         for cid in to_remove:
             hc = HANDLED_CONTACTS.pop(cid, None)
-            if not hc: continue
+            if not hc:
+                continue
             
             name = hc["name"]
             duration = int((now - hc["start_time"]) / 60)

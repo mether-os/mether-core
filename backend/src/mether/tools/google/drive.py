@@ -1,3 +1,4 @@
+from typing import Any
 from pathlib import Path
 from mether.tools.base import BaseTool, ToolResult, SecurityLevel
 from .base_google import BaseGoogleTool
@@ -96,7 +97,7 @@ Google Drive tool. Actions:
                 if not local_path.exists():
                     return ToolResult(success=False, error=f"File not found: {local_path}")
                 
-                file_metadata = {"name": local_path.name}
+                file_metadata: dict[str, Any] = {"name": local_path.name}
                 if kwargs.get("folder_id"):
                     file_metadata["parents"] = [kwargs["folder_id"]]
                 

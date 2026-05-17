@@ -93,10 +93,10 @@ Google Calendar tool. Actions:
             
             elif action == "upcoming":
                 count = kwargs.get("count", 5)
-                now = datetime.now(timezone.utc).isoformat()
+                now_str = datetime.now(timezone.utc).isoformat()
                 events = service.events().list(
                     calendarId="primary",
-                    timeMin=now,
+                    timeMin=now_str,
                     maxResults=count,
                     singleEvents=True,
                     orderBy="startTime"
@@ -138,7 +138,7 @@ Google Calendar tool. Actions:
                 })
             
             elif action == "find_slot":
-                duration = kwargs.get("duration_minutes", 60)
+                _duration = kwargs.get("duration_minutes", 60)
                 within_days = kwargs.get("within_days", 7)
                 
                 # Get events for the next N days
