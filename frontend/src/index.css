@@ -1,111 +1,611 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+/* ═══════════════════════════════════════════════════════════
+   METHER OS — Tactical Intelligence Interface
+   Design System & Tailwind v4 Theme
+   ═══════════════════════════════════════════════════════════ */
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+@import "tailwindcss";
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* ───────────────────────────────────────────────────────────
+   THEME — Custom Design Tokens
+   ─────────────────────────────────────────────────────────── */
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+@theme {
+  /* ── Color Palette ── */
+  --color-void: #050810;
+  --color-surface: #10131c;
+  --color-surface-dim: #10131c;
+  --color-surface-bright: #353943;
+  --color-surface-container-lowest: #0a0e16;
+  --color-surface-container-low: #181c24;
+  --color-surface-container: #1c2028;
+  --color-surface-container-high: #262a33;
+  --color-surface-container-highest: #31353e;
+
+  --color-on-surface: #e0e2ee;
+  --color-on-surface-variant: #bcc9cd;
+  --color-inverse-surface: #e0e2ee;
+  --color-inverse-on-surface: #2d303a;
+
+  --color-outline: #869397;
+  --color-outline-variant: #3d494c;
+
+  --color-primary: #4cd7f6;
+  --color-on-primary: #003640;
+  --color-primary-container: #06b6d4;
+  --color-on-primary-container: #00424f;
+  --color-inverse-primary: #00687a;
+  --color-primary-fixed: #acedff;
+  --color-primary-fixed-dim: #4cd7f6;
+  --color-surface-tint: #4cd7f6;
+
+  --color-secondary: #adc6ff;
+  --color-on-secondary: #002e6a;
+  --color-secondary-container: #0566d9;
+  --color-on-secondary-container: #e6ecff;
+
+  --color-tertiary: #ffb2b7;
+  --color-on-tertiary: #67001b;
+  --color-tertiary-container: #ff7f8b;
+  --color-on-tertiary-container: #7d0023;
+
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+
+  /* ── Glow presets (used in box-shadow utilities) ── */
+  --color-glow-cyan: rgba(76, 215, 246, 0.35);
+  --color-glow-cyan-intense: rgba(76, 215, 246, 0.6);
+  --color-glow-blue: rgba(173, 198, 255, 0.25);
+  --color-glow-error: rgba(255, 180, 171, 0.3);
+
+  /* ── Font Families ── */
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "Fira Code", monospace;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Font Sizes (with line-height tuples) ── */
+  --font-size-2xs: 0.625rem;   /* 10px — data-mono */
+  --font-size-xs: 0.75rem;     /* 12px — label-caps */
+  --font-size-sm: 0.875rem;    /* 14px — body-md */
+  --font-size-base: 1rem;      /* 16px — body-lg */
+  --font-size-lg: 1.25rem;     /* 20px — headline-md */
+  --font-size-xl: 1.5rem;      /* 24px — headline-lg-mobile */
+  --font-size-2xl: 2rem;       /* 32px — headline-lg */
+  --font-size-3xl: 3rem;       /* 48px — headline-xl */
+
+  /* ── Spacing scale (4px base unit) ── */
+  --spacing-unit: 4px;
+  --spacing-gutter: 16px;
+  --spacing-margin: 24px;
+  --spacing-panel: 12px;
+
+  /* ── Border Radius ── */
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+
+  /* ── Animations ── */
+  --animate-breathe: breathe 4s ease-in-out infinite;
+  --animate-ring-spin: ring-spin 12s linear infinite;
+  --animate-ring-spin-reverse: ring-spin 16s linear infinite reverse;
+  --animate-flicker: flicker 3s steps(4, end) infinite;
+  --animate-scan: scan 6s linear infinite;
+  --animate-type-in: type-in 0.6s steps(20) forwards;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.4s ease-out forwards;
+  --animate-slide-up: slide-up 0.5s ease-out forwards;
+
+  /* ── Keyframes ── */
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes ring-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes flicker {
+    0% {
+      opacity: 1;
+    }
+    10% {
+      opacity: 0.8;
+    }
+    20% {
+      opacity: 1;
+    }
+    40% {
+      opacity: 0.6;
+    }
+    44% {
+      opacity: 1;
+    }
+    70% {
+      opacity: 0.85;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes scan {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100vh);
+    }
+  }
+
+  @keyframes type-in {
+    from {
+      width: 0;
+      opacity: 0;
+    }
+    to {
+      width: 100%;
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      box-shadow: 0 0 8px var(--color-glow-cyan);
+    }
+    50% {
+      box-shadow: 0 0 20px var(--color-glow-cyan-intense);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* ───────────────────────────────────────────────────────────
+   BASE — Global Resets & Defaults
+   ─────────────────────────────────────────────────────────── */
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
-  margin: 0;
+  min-height: 100vh;
+  background-color: var(--color-void);
+  color: var(--color-on-surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  overflow-x: hidden;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+/* Scrollbar styling — tactical aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
 }
 
-code,
-.counter {
-  font-family: var(--mono);
+::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* Selection highlight */
+::selection {
+  background-color: rgba(76, 215, 246, 0.3);
+  color: var(--color-on-surface);
+}
+
+/* ───────────────────────────────────────────────────────────
+   HUD UTILITY CLASSES
+   ─────────────────────────────────────────────────────────── */
+
+/* ── .hud-panel ──
+   Dark surface container with 1px cyan border and subtle glow.
+   Use for any card, section, or data container. */
+.hud-panel {
+  background-color: var(--color-surface);
+  border: 1px solid rgba(76, 215, 246, 0.2);
+  padding: var(--spacing-panel);
+  position: relative;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hud-panel:hover {
+  border-color: rgba(76, 215, 246, 0.4);
+  box-shadow: 0 0 15px rgba(76, 215, 246, 0.08);
+}
+
+/* ── .hud-label ──
+   Uppercase, tracked, monospaced, cyan — for section headers and metadata. */
+.hud-label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  line-height: 1;
+  user-select: none;
+}
+
+/* ── .hud-metric ──
+   Bold, large, cyan with neon glow — for key numbers and stats. */
+.hud-metric {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-primary);
+  text-shadow: 0 0 12px var(--color-glow-cyan),
+               0 0 24px rgba(76, 215, 246, 0.15);
+  line-height: 1.1;
+}
+
+/* ── .hud-button ──
+   Rectangular, cyan border, fills on hover with text inversion. */
+.hud-button {
   display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: transparent;
+  border: 1px solid var(--color-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+.hud-button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+  z-index: 0;
+}
+
+.hud-button:hover::before {
+  transform: scaleX(1);
+}
+
+.hud-button:hover {
+  color: var(--color-void);
+  box-shadow: 0 0 15px var(--color-glow-cyan);
+}
+
+.hud-button > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hud-button:active {
+  transform: scale(0.97);
+}
+
+.hud-button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── .hud-terminal ──
+   Dark background, monospaced, scrollable terminal feed. */
+.hud-terminal {
+  background-color: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+  color: var(--color-on-surface-variant);
+  padding: var(--spacing-panel);
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 400px;
+  scrollbar-width: thin;
+}
+
+.hud-terminal .entry {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: type-in 0.6s steps(20) forwards;
+}
+
+/* ── .hud-chip ──
+   Small tag, cyan, all-caps with dot indicator. */
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  border: 1px solid rgba(76, 215, 246, 0.3);
+  background: rgba(76, 215, 246, 0.06);
+  line-height: 1.6;
+  user-select: none;
+}
+
+.hud-chip::before {
+  content: "●";
+  font-size: 6px;
+  line-height: 1;
+}
+
+/* Chip variants */
+.hud-chip--success {
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.hud-chip--success::before {
+  color: var(--color-success);
+}
+
+.hud-chip--warning {
+  color: var(--color-warning);
+  border-color: rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.hud-chip--warning::before {
+  color: var(--color-warning);
+}
+
+.hud-chip--error {
+  color: var(--color-error);
+  border-color: rgba(255, 180, 171, 0.3);
+  background: rgba(255, 180, 171, 0.06);
+}
+
+.hud-chip--error::before {
+  color: var(--color-error);
+}
+
+/* ── .hud-corner-bracket ──
+   L-shaped decorative corners for panels. Apply to a parent
+   container — corners are rendered via pseudo-elements. */
+.hud-corner-bracket {
+  position: relative;
+}
+
+.hud-corner-bracket::before,
+.hud-corner-bracket::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--color-primary);
+  border-style: solid;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Top-left corner */
+.hud-corner-bracket::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+
+/* Bottom-right corner */
+.hud-corner-bracket::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+/* Additional corners via nested element with .hud-corner-bracket--extra */
+.hud-corner-bracket--extra::before {
+  top: -1px;
+  right: -1px;
+  left: auto;
+  border-width: 2px 2px 0 0;
+}
+
+.hud-corner-bracket--extra::after {
+  bottom: -1px;
+  left: -1px;
+  right: auto;
+  border-width: 0 0 2px 2px;
+}
+
+/* ── .hud-grid ──
+   Repeating tactical grid background overlay. */
+.hud-grid {
+  position: relative;
+}
+
+.hud-grid::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(76, 215, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(76, 215, 246, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ───────────────────────────────────────────────────────────
+   TYPOGRAPHY PRESETS
+   ─────────────────────────────────────────────────────────── */
+
+.text-headline-xl {
+  font-family: var(--font-display);
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.text-headline-lg {
+  font-family: var(--font-display);
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.text-headline-md {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.text-body-lg {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.text-body-md {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.text-label-caps {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.text-data-mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.05em;
+}
+
+/* ───────────────────────────────────────────────────────────
+   GLOW & EFFECTS
+   ─────────────────────────────────────────────────────────── */
+
+.glow-cyan {
+  box-shadow: 0 0 15px var(--color-glow-cyan);
+}
+
+.glow-cyan-intense {
+  box-shadow: 0 0 25px var(--color-glow-cyan-intense);
+}
+
+.glow-blue {
+  box-shadow: 0 0 15px var(--color-glow-blue);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 8px var(--color-glow-cyan),
+               0 0 16px rgba(76, 215, 246, 0.1);
+}
+
+/* ── Scan-line overlay ──
+   A subtle animated line sweeping down the viewport.
+   Apply to the outermost wrapper. */
+.scan-line-overlay::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(76, 215, 246, 0.15) 30%,
+    rgba(76, 215, 246, 0.3) 50%,
+    rgba(76, 215, 246, 0.15) 70%,
+    transparent 100%
+  );
+  animation: scan 6s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── CRT grain noise — very subtle ── */
+.noise-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9998;
 }
