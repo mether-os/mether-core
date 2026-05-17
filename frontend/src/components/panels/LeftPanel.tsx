@@ -22,7 +22,7 @@ const LOG_POOL: [string, string][] = [
   ["MEMORY", "Fetching from ChromaDB..."],
   ["TOOL", "Calendar.read() executed"],
   ["VOICE", "Wake word detected"],
-  ["WS", "Client connected on port 8000"],
+  ["WS", "Client connected to backend stream"],
   ["LLM", "Token stream started"],
   ["MEMORY", "SQLite write complete"],
   ["TOOL", "Gmail.search() executed"],

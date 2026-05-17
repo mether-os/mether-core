@@ -20,6 +20,15 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
+    # --- Environment --------------------------------------------------------
+    environment: str = "development"
+    frontend_url: str = "http://localhost:5173"
+    allowed_origins: list[str] = ["http://localhost:5173"]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
     # --- LLM Proxy ---------------------------------------------------------
     llm_proxy_url: str = "http://localhost:8082"
     llm_model: str = "nvidia_nim/z-ai/glm4.7"

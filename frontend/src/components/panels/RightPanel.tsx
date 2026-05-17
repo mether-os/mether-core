@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useMetherStore } from "@/stores/metherStore";
+import config from "../../config";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Right Panel
@@ -375,7 +376,7 @@ function GoogleServices() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch("http://localhost:8000/google/status");
+      const res = await fetch(`${config.backendUrl}/google/status`);
       const data = await res.json();
       setStatus(data);
     } catch {
@@ -392,7 +393,7 @@ function GoogleServices() {
 
   const handleConnect = async () => {
     try {
-      await fetch("http://localhost:8000/google/auth");
+      await fetch(`${config.backendUrl}/google/auth`);
       setTimeout(fetchStatus, 3000);
     } catch (err) {
       console.error(err);

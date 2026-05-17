@@ -15,10 +15,37 @@ from mether.utils.whatsapp_formatter import format_for_whatsapp
 router = APIRouter(tags=["mether"])
 
 
+async def load_google_from_env():
+    """Load Google credentials from env vars on Render."""
+    import os
+    from pathlib import Path
+    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    token_json = os.getenv("GOOGLE_TOKEN_JSON")
+    claude_md = os.getenv("CLAUDE_MD_CONTENT")
+    
+    if creds_json:
+        Path("/tmp/google_credentials.json").write_text(creds_json)
+    if token_json:
+        Path("/tmp/google_token.json").write_text(token_json)
+    if claude_md:
+        Path("/tmp/CLAUDE.md").write_text(claude_md)
+
 @router.get("/health")
-async def health() -> dict[str, str]:
+async def health(request: Request) -> dict[str, Any]:
     """Liveness probe — always returns OK."""
-    return {"status": "ok", "version": "0.1.0"}
+    from mether.config import get_settings
+    config = get_settings()
+    
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "environment": config.environment,
+        "services": {
+            "llm_proxy": "connected" if config.llm_proxy_url else "unreachable",
+            "google": "configured" if config.google_client_id else "not_configured",
+            "whatsapp": "connected"
+        }
+    }
 
 
 @router.get("/status")

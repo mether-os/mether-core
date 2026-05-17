@@ -112,6 +112,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     log = structlog.get_logger("mether.main")
 
     log.info("startup.begin", version="0.1.0")
+    log.info("startup.config", 
+        environment=config.environment,
+        llm_model=config.llm_model,
+        proxy=config.llm_proxy_url,
+        mether_port=config.mether_port,
+        allowed_origins=config.allowed_origins
+    )
+
+    # 2.5 Render Environment prep
+    from mether.api.routes import load_google_from_env
+    await load_google_from_env()
 
     # 3. Init EventBus
     bus = EventBus()
@@ -192,13 +203,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# --- CORS (allow the React frontend on :5173) ---
+# --- CORS ---
+app_config = get_settings()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=app_config.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

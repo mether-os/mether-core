@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { useMetherStore } from "@/stores/metherStore";
 import type { ConnectionStatus } from "@/stores/metherStore";
+import config from "../config";
 
-const WS_URL = "ws://localhost:8000/ws";
+const WS_URL = config.wsUrl;
 const BASE_DELAY = 1000;
 const MAX_DELAY = 8000;
 
