@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import structlog
 import uvicorn
@@ -48,7 +48,7 @@ def _configure_logging(level: str, is_production: bool = False) -> None:
     """Set up structlog with human-readable console output or JSON for production."""
     numeric_level = _LOG_LEVEL_MAP.get(level.upper(), _stdlib_logging.INFO)
     
-    processors = [
+    processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.StackInfoRenderer(),
