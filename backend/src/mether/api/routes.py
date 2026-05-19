@@ -12,7 +12,8 @@ import time
 from mether.tools.whatsapp import HANDLED_CONTACTS
 from mether.utils.whatsapp_formatter import format_for_whatsapp
 
-router = APIRouter(tags=["mether"])
+router = APIRouter(tags=["mether"], prefix="/api/v1")
+root_router = APIRouter(tags=["health"])
 
 
 async def load_google_from_env():
@@ -30,6 +31,7 @@ async def load_google_from_env():
     if claude_md:
         Path("/tmp/CLAUDE.md").write_text(claude_md)
 
+@root_router.get("/health")
 @router.get("/health")
 async def health(request: Request) -> dict[str, Any]:
     """Liveness probe — always returns OK."""

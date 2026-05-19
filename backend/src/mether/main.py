@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from mether.agent.agent import METHERAgent
 from mether.agent.llm import LLMClient
-from mether.api.routes import router
+from mether.api.routes import router, root_router
 from mether.api.websocket import websocket_endpoint, voice_ws
 from mether.config import Settings, get_settings
 from mether.events.bus import EventBus
@@ -44,18 +44,25 @@ _LOG_LEVEL_MAP: dict[str, int] = {
 }
 
 
-def _configure_logging(level: str) -> None:
-    """Set up structlog with human-readable console output."""
+def _configure_logging(level: str, is_production: bool = False) -> None:
+    """Set up structlog with human-readable console output or JSON for production."""
     numeric_level = _LOG_LEVEL_MAP.get(level.upper(), _stdlib_logging.INFO)
+    
+    processors = [
+        structlog.contextvars.merge_contextvars,
+        structlog.processors.add_log_level,
+        structlog.processors.StackInfoRenderer(),
+        structlog.dev.set_exc_info,
+        structlog.processors.TimeStamper(fmt="iso"),
+    ]
+    
+    if is_production:
+        processors.append(structlog.processors.JSONRenderer())
+    else:
+        processors.append(structlog.dev.ConsoleRenderer())
+
     structlog.configure(
-        processors=[
-            structlog.contextvars.merge_contextvars,
-            structlog.processors.add_log_level,
-            structlog.processors.StackInfoRenderer(),
-            structlog.dev.set_exc_info,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.dev.ConsoleRenderer(),
-        ],
+        processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(numeric_level),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(),
@@ -108,7 +115,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config: Settings = get_settings()
 
     # 2. Init structured logging
-    _configure_logging(config.log_level)
+    _configure_logging(config.log_level, config.is_production)
     log = structlog.get_logger("mether.main")
 
     log.info("startup.begin", version="0.1.0")
@@ -214,6 +221,7 @@ app.add_middleware(
 )
 
 # --- REST routes ---
+app.include_router(root_router)
 app.include_router(router)
 
 
