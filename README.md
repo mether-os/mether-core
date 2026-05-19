@@ -108,14 +108,19 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for a template.
 ---
 
 ## Project Structure
+
+```text
 mether-core/
-├── backend/          Python (FastAPI, asyncio, tool system)
-├── frontend/         React 19, TypeScript, real-time WebSocket UI
-├── voice/            STT + TTS + wake word sidecar (Python)
-├── whatsapp/         WhatsApp bridge sidecar (Node.js)
-├── infra/            Startup scripts, installer, Docker
-└── docs/             Architecture, configuration, tool development
----
+├── 📂 backend/       # Python (FastAPI, asyncio, tool system)
+│   ├── 🛠️ agent/     # Core reasoning & tool-calling loop
+│   ├── 🌐 api/       # REST v1 routes & WebSocket handlers
+│   └── ⚙️ tools/     # Tool implementations (Gmail, WhatsApp, etc.)
+├── 📂 frontend/      # React 19, TypeScript, real-time HUD dashboard
+├── 📂 voice/         # STT + TTS + wake word sidecar (Python)
+├── 📂 whatsapp/      # WhatsApp-web.js bridge sidecar (Node.js)
+├── 📂 infra/         # Startup scripts, installer, Docker config
+└── 📂 docs/          # Architecture, Configuration, Tool Dev guides
+```
 
 ## Available Tools
 
