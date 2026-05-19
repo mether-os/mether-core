@@ -27,13 +27,23 @@ _FALLBACK_RESPONSE = (
 
 
 class METHERAgent:
-    """Core reasoning engine.
-
-    1. Receives a user message.
-    2. Builds a system prompt from CLAUDE.md + available tools.
-    3. Calls the LLM (with tool schemas).
-    4. If the LLM requests tool calls, executes them and feeds results back.
-    5. Returns the final text response.
+    """
+    Core reasoning agent for METHER OS.
+    
+    Processes natural language input through an LLM with tool-calling
+    capabilities. Maintains conversation context and executes tools
+    based on LLM decisions.
+    
+    Security levels:
+        - READ (0): Executes immediately, no confirmation needed
+        - WRITE (1): Executes immediately, logs action
+        - DANGEROUS (2): Requires explicit user confirmation via UI
+    
+    Args:
+        llm: LLM client instance (connects to free-claude-code proxy)
+        tools: Tool registry with all available tools
+        memory: Context memory (CLAUDE.md + session history)
+        bus: Event bus for UI and service communication
     """
 
     def __init__(

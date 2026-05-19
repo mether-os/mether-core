@@ -31,10 +31,27 @@ class ToolResult(BaseModel):
 
 
 class BaseTool(ABC):
-    """Every METHER tool must inherit from this class.
-
-    Subclasses **must** define ``name``, ``description``,
-    ``security_level``, and implement :meth:`execute`.
+    """
+    Abstract base class for all METHER OS tools.
+    
+    All tools must inherit from this class and implement execute().
+    Tools are automatically discovered and registered via ToolRegistry.
+    
+    To create a new tool:
+        1. Inherit from BaseTool
+        2. Set name, description, security_level
+        3. Implement execute()
+        4. Register in main.py: registry.register(MyTool())
+    
+    Example:
+        class WeatherTool(BaseTool):
+            name = "weather"
+            description = "Get current weather for a location"
+            security_level = SecurityLevel.READ
+            
+            async def execute(self, location: str) -> ToolResult:
+                # implementation
+                return ToolResult(success=True, data={...})
     """
 
     name: str
