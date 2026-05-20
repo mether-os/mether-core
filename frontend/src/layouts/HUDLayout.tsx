@@ -53,8 +53,12 @@ function TopBar() {
     <header
       id="hud-top-bar"
       className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-5
-                 bg-surface-container border-b border-primary/20 select-none"
-      style={{ height: TOP_BAR_H }}
+                 bg-surface-container select-none"
+      style={{
+        height: TOP_BAR_H,
+        borderBottom: "1px solid rgba(76,215,246,0.12)",
+        boxShadow: "0 1px 20px rgba(76,215,246,0.04)",
+      }}
     >
       {/* ── Left: System ID + status dots ── */}
       <div className="flex items-center gap-3">
@@ -86,16 +90,22 @@ function TopBar() {
 
       {/* ── Right: Status chips (reactive to connection) ── */}
       <div className="hidden md:flex items-center gap-2">
-        <span className={onlineChip.cls}>{onlineChip.label}</span>
+        <span className={`${onlineChip.cls} transition-all duration-200 hover:shadow-[0_0_8px_rgba(76,215,246,0.4)]`}>
+          {onlineChip.label}
+        </span>
         {voiceStatus === "online" ? (
-          <span className="hud-chip !border-[#c084fc]/50 !text-[#f3e8ff] !bg-[#c084fc]/10 shadow-[0_0_10px_rgba(192,132,252,0.2)]">
+          <span className="hud-chip !border-[#c084fc]/50 !text-[#f3e8ff] !bg-[#c084fc]/10 shadow-[0_0_10px_rgba(192,132,252,0.2)] transition-all duration-200 hover:shadow-[0_0_8px_rgba(76,215,246,0.4)]">
             ● VOICE
           </span>
         ) : (
-          <span className="hud-chip opacity-50">○ VOICE</span>
+          <span className="hud-chip opacity-50 transition-all duration-200 hover:shadow-[0_0_8px_rgba(76,215,246,0.4)]">
+            ○ VOICE
+          </span>
         )}
-        <span className="hud-chip">SECURE</span>
-        <span className={`hud-chip ${connectionStatus === "connected" ? "hud-chip--success" : ""}`}>
+        <span className="hud-chip transition-all duration-200 hover:shadow-[0_0_8px_rgba(76,215,246,0.4)]">
+          SECURE
+        </span>
+        <span className={`hud-chip ${connectionStatus === "connected" ? "hud-chip--success" : ""} transition-all duration-200 hover:shadow-[0_0_8px_rgba(76,215,246,0.4)]`}>
           SYNC
         </span>
       </div>
@@ -235,28 +245,27 @@ function CenterViewport({ children }: { children?: ReactNode }) {
       />
 
       {/* Crosshair guides — very subtle center indicators */}
-      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-        {/* Horizontal line */}
-        <div className="absolute w-full h-px bg-primary/[0.04]" />
-        {/* Vertical line */}
-        <div className="absolute h-full w-px bg-primary/[0.04]" />
-        {/* Center tick marks */}
-        <div className="absolute w-6 h-px bg-primary/20" />
-        <div className="absolute h-6 w-px bg-primary/20" />
+      <div className="absolute inset-0 pointer-events-none">
+        {/* Horizontal */}
+        <div
+          className="absolute left-0 right-0 h-px"
+          style={{
+            top: "50%",
+            background: "linear-gradient(90deg, transparent, rgba(76,215,246,0.06), transparent)",
+          }}
+        />
+        {/* Vertical */}
+        <div
+          className="absolute top-0 bottom-0 w-px"
+          style={{
+            left: "50%",
+            background: "linear-gradient(180deg, transparent, rgba(76,215,246,0.06), transparent)",
+          }}
+        />
       </div>
 
       {/* Content mounts here (Voice Orb, etc.) */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-[400px] w-[360px]">
-        {/* Ambient background glow */}
-        <div 
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `radial-gradient(ellipse 55% 55% at 50% 50%, 
-              rgba(167,139,250,0.08) 0%, 
-              rgba(76,215,246,0.05) 40%, 
-              transparent 70%)`,
-          }}
-        />
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-full w-full">
         {children}
       </div>
     </main>
@@ -283,9 +292,27 @@ export default function HUDLayout({
   commandBar,
 }: HUDLayoutProps) {
   return (
-    <div id="hud-layout" className="min-h-screen bg-void scan-line-overlay noise-overlay">
+    <div id="hud-layout" className="min-h-screen bg-void noise-overlay">
       {/* ── Full-screen vignette ── */}
       <div className="vignette-overlay" />
+
+      {/* ── Scan lines ── */}
+      <div 
+        className="fixed inset-x-0 pointer-events-none z-[9999] h-[2px]"
+        style={{
+          background: "linear-gradient(90deg, transparent 0%, rgba(76, 215, 246, 0.15) 30%, rgba(76, 215, 246, 0.3) 50%, rgba(76, 215, 246, 0.15) 70%, transparent 100%)",
+          animation: "scan 8s linear infinite",
+          opacity: 0.06,
+        }}
+      />
+      <div 
+        className="fixed inset-x-0 pointer-events-none z-[9999] h-[2px]"
+        style={{
+          background: "linear-gradient(90deg, transparent 0%, rgba(76, 215, 246, 0.15) 30%, rgba(76, 215, 246, 0.3) 50%, rgba(76, 215, 246, 0.15) 70%, transparent 100%)",
+          animation: "scan 16s linear infinite reverse",
+          opacity: 0.03,
+        }}
+      />
       {/* ── Edge bars ── */}
       <TopBar />
       <BottomBar />

@@ -99,6 +99,21 @@
   --animate-slide-up: slide-up 0.5s ease-out forwards;
 
   /* ── Keyframes ── */
+  @keyframes waveform {
+    from { transform: scaleY(0.3); }
+    to   { transform: scaleY(1); }
+  }
+
+  @keyframes orbPulse {
+    0%, 100% { opacity: 0.6; transform: scale(1); }
+    50%       { opacity: 1;   transform: scale(1.02); }
+  }
+
+  @keyframes dataSlide {
+    from { opacity: 0; transform: translateX(-4px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
   @keyframes breathe {
     0%,
     100% {
@@ -254,6 +269,8 @@ body {
   padding: var(--spacing-panel);
   position: relative;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .hud-panel:hover {
@@ -303,7 +320,7 @@ body {
   background: transparent;
   border: 1px solid var(--color-primary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   user-select: none;
   position: relative;
   overflow: hidden;
@@ -320,13 +337,10 @@ body {
   z-index: 0;
 }
 
-.hud-button:hover::before {
-  transform: scaleX(1);
-}
-
 .hud-button:hover {
-  color: var(--color-void);
-  box-shadow: 0 0 15px var(--color-glow-cyan);
+  background: rgba(76, 215, 246, 0.08);
+  box-shadow: 0 0 12px rgba(76, 215, 246, 0.25);
+  color: var(--color-primary);
 }
 
 .hud-button > * {
@@ -573,24 +587,7 @@ body {
    A subtle animated line sweeping down the viewport.
    Apply to the outermost wrapper. */
 .scan-line-overlay::after {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(76, 215, 246, 0.15) 30%,
-    rgba(76, 215, 246, 0.3) 50%,
-    rgba(76, 215, 246, 0.15) 70%,
-    transparent 100%
-  );
-  animation: scan 8s linear infinite;
-  opacity: 0.03;
-  pointer-events: none;
-  z-index: 9999;
+  display: none;
 }
 
 /* ── CRT grain noise — very subtle ── */
@@ -608,10 +605,9 @@ body {
   position: fixed;
   inset: 0;
   background: radial-gradient(
-    ellipse at center,
-    transparent 40%,
-    rgba(5, 8, 16, 0.4) 70%,
-    rgba(5, 8, 16, 0.8) 100%
+    ellipse 100% 100% at 50% 50%,
+    transparent 60%,
+    rgba(5, 8, 16, 0.6) 100%
   );
   pointer-events: none;
   z-index: 9997;
