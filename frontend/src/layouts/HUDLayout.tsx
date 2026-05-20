@@ -216,7 +216,7 @@ function CenterViewport({ children }: { children?: ReactNode }) {
   return (
     <main
       id="hud-center-viewport"
-      className="fixed z-30 flex items-center justify-center overflow-hidden left-0 right-0 md:left-[260px] md:right-[260px]"
+      className="fixed z-30 flex items-center justify-center overflow-visible left-0 right-0 md:left-[260px] md:right-[260px]"
       style={{
         top: TOP_BAR_H,
         bottom: BOTTOM_TOTAL,
@@ -246,7 +246,17 @@ function CenterViewport({ children }: { children?: ReactNode }) {
       </div>
 
       {/* Content mounts here (Voice Orb, etc.) */}
-      <div className="relative z-10 flex items-center justify-center">
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-[400px] w-[360px]">
+        {/* Ambient background glow */}
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse 55% 55% at 50% 50%, 
+              rgba(167,139,250,0.08) 0%, 
+              rgba(76,215,246,0.05) 40%, 
+              transparent 70%)`,
+          }}
+        />
         {children}
       </div>
     </main>

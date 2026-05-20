@@ -90,8 +90,7 @@
 
   /* ── Animations ── */
   --animate-breathe: breathe 4s ease-in-out infinite;
-  --animate-ring-spin: ring-spin 12s linear infinite;
-  --animate-ring-spin-reverse: ring-spin 16s linear infinite reverse;
+
   --animate-flicker: flicker 3s steps(4, end) infinite;
   --animate-scan: scan 6s linear infinite;
   --animate-type-in: type-in 0.6s steps(20) forwards;
@@ -112,14 +111,7 @@
     }
   }
 
-  @keyframes ring-spin {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
+
 
   @keyframes flicker {
     0% {
