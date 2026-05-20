@@ -99,12 +99,12 @@ function App() {
         </>
       }
     >
-      <div className="flex flex-col items-center justify-center w-full h-full">
+      <div className="relative flex-1 w-full h-full">
         <METHERCore 
           state={(voiceStatus === "offline" && !isDemo && orbState === "idle") ? "sleeping" : orbState} 
           onActivate={handleOrbActivate} 
         />
-        <div className="md:hidden mt-8 w-[90%] max-w-sm h-32 border border-primary/20 bg-surface-container/50 rounded-sm p-2 flex flex-col pointer-events-auto">
+        <div className="md:hidden absolute bottom-0 left-[5%] w-[90%] max-w-sm h-32 border border-primary/20 bg-surface-container/50 rounded-sm p-2 flex flex-col pointer-events-auto">
           <AgentLog />
         </div>
       </div>

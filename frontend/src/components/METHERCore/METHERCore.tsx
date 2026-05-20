@@ -45,9 +45,9 @@ export default function METHERCore({ state, onActivate }: METHERCoreProps) {
 
   return (
     <div
-      className="relative w-full h-full flex items-center justify-center"
+      className="absolute inset-0 flex items-center justify-center"
       onClick={onActivate}
-      style={{ cursor: onActivate ? 'pointer' : undefined }}
+      style={{ cursor: onActivate ? 'pointer' : undefined, minHeight: 300 }}
     >
       {/* Layered ambient glow — 3 radial gradients stacked */}
       <div className="absolute inset-0 pointer-events-none" style={{

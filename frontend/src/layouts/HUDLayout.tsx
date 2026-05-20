@@ -273,7 +273,7 @@ function CenterViewport({ children }: { children?: ReactNode }) {
       </div>
 
       {/* Content mounts here (Voice Orb, etc.) */}
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-full w-full">
+      <div className="relative z-10 flex flex-col items-center justify-center h-full w-full">
         {children}
       </div>
     </main>
