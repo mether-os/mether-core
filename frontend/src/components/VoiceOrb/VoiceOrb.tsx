@@ -1,8 +1,9 @@
 'use client'
-import { Suspense, useMemo, useRef } from 'react'
+import { Suspense, useMemo, useRef, useState, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useMetherStore } from '@/stores/metherStore'
 
 export type OrbState = 'sleeping' | 'idle' | 'listening' | 'processing' | 'speaking'
@@ -57,6 +58,10 @@ function Spherebody({ state }: { state: string }) {
   const matRef = useRef<THREE.ShaderMaterial>(null!)
   const clock = useRef(0)
 
+  const currentEnergy = useRef(0.4)
+  const currentSpeed  = useRef(0.12)
+  const currentBreath = useRef(1.0)
+
   const { geo } = useMemo(() => {
     const N = 10000
     const pos   = new Float32Array(N * 3)
@@ -103,9 +108,10 @@ function Spherebody({ state }: { state: string }) {
 
   const mat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
-      uTime:    { value: 0 },
-      uBreath:  { value: 1 },
-      uEnergy:  { value: 0.4 },
+      uTime:     { value: 0 },
+      uBreath:   { value: 1 },
+      uEnergy:   { value: 0.4 },
+      uColorMix: { value: 0.0 },
     },
     vertexShader: /* glsl */`
       attribute float aSize;
@@ -114,9 +120,11 @@ function Spherebody({ state }: { state: string }) {
       uniform  float uTime;
       uniform  float uBreath;
       uniform  float uEnergy;
+      uniform  float uColorMix;
 
       void main() {
-        vCol = color;
+        // Shift colors toward purple/warm when uColorMix > 0
+        vCol = mix(color, vec3(color.r + 0.3, color.g * 0.3, color.b * 0.8), uColorMix * 0.4);
         vec3 p = position * uBreath;
 
         // Per-particle noise displacement
@@ -159,21 +167,31 @@ function Spherebody({ state }: { state: string }) {
   useFrame((_, dt) => {
     clock.current += dt
     const t = clock.current
-    const spd = speedMap[state] ?? 0.12
-    const eng = energyMap[state] ?? 0.4
+    const targetEnergy = energyMap[state] ?? 0.4
+    const targetSpeed  = speedMap[state]  ?? 0.12
+    const targetMix = state === 'processing' ? 1.0
+      : state === 'listening' ? 0.7
+      : state === 'speaking'  ? 0.3
+      : 0.0
 
-    ref.current.rotation.y += 0.004 * spd * 8
-    ref.current.rotation.x += 0.0015 * spd * 8
+    // Lerp speed & energy: 0.025 = smooth ~1.5s transition
+    currentEnergy.current += (targetEnergy - currentEnergy.current) * 0.025
+    currentSpeed.current  += (targetSpeed  - currentSpeed.current)  * 0.025
+    mat.uniforms.uColorMix.value += (targetMix - mat.uniforms.uColorMix.value) * 0.02
+
+    // Lerp breath scale dynamically
+    let targetBreath = 1.0 + Math.sin(t * 0.9) * 0.022
+    if (state === 'speaking') {
+      targetBreath *= 1.0 + Math.sin(t * 11) * 0.035 + Math.sin(t * 7) * 0.018
+    }
+    currentBreath.current += (targetBreath - currentBreath.current) * 0.025
+
+    ref.current.rotation.y += 0.004 * currentSpeed.current * 8
+    ref.current.rotation.x += 0.0015 * currentSpeed.current * 8
 
     mat.uniforms.uTime.value   = t
-    mat.uniforms.uEnergy.value += (eng - mat.uniforms.uEnergy.value) * 0.03
-
-    // Breathing
-    let breath = 1 + Math.sin(t * 0.9) * 0.022
-    if (state === 'speaking') {
-      breath *= 1 + Math.sin(t * 11) * 0.035 + Math.sin(t * 7) * 0.018
-    }
-    mat.uniforms.uBreath.value = breath
+    mat.uniforms.uEnergy.value = currentEnergy.current
+    mat.uniforms.uBreath.value = currentBreath.current
   })
 
   // Cleanup geometries & shaders
@@ -197,6 +215,8 @@ function Ribbon({
   const ref   = useRef<THREE.Points>(null!)
   const matRef = useRef<THREE.PointsMaterial>(null!)
   const t = useRef(phaseOffset)
+  const currentSpeed = useRef(0.9)
+  const currentOpacity = useRef(0.85)
 
   const geo = useMemo(() => {
     const N   = particleCount
@@ -241,11 +261,20 @@ function Ribbon({
   }
 
   useFrame((_, dt) => {
-    t.current += dt * speed * (spdMap[state] ?? 1)
+    const targetSpeed = spdMap[state] ?? 1.0
+    currentSpeed.current += (targetSpeed - currentSpeed.current) * 0.02
+    t.current += dt * speed * currentSpeed.current
+
     ref.current.rotation.set(tiltX, t.current, tiltZ)
-    const pulse = 0.7 + 0.3 * Math.sin(t.current * 2.5)
-    mat.opacity = 0.85 * pulse
-    if (state === 'speaking') mat.opacity = 0.9 + 0.1 * Math.sin(t.current * 9)
+
+    const targetOpacity = state === 'speaking' ? 1.0
+      : state === 'listening' ? 0.95
+      : state === 'processing' ? 0.98
+      : 0.75
+
+    currentOpacity.current += (targetOpacity - currentOpacity.current) * 0.03
+    const pulse = 0.8 + 0.2 * Math.sin(t.current * 2.5)
+    mat.opacity = currentOpacity.current * pulse
   })
 
   // Cleanup
@@ -275,16 +304,50 @@ function EnergyRibbons({ state }: { state: string }) {
 }
 
 // ---- SCENE ----
+function BloomController({ 
+  state, 
+  bloomRef 
+}: { 
+  state: string
+  bloomRef: React.MutableRefObject<number>
+}) {
+  const targetMap: Record<string, number> = {
+    sleeping: 0.6, idle: 1.4, listening: 2.0, processing: 2.6, speaking: 3.2
+  }
+
+  useFrame(() => {
+    const target = targetMap[state] ?? 1.4
+    bloomRef.current += (target - bloomRef.current) * 0.018
+  })
+
+  return null
+}
+
 function Scene({ state }: { state: string }) {
+  const [bloomVal, setBloomVal] = useState(1.4)
+  const bloomRef = useRef(1.4)
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setBloomVal(prev => {
+        const diff = bloomRef.current - prev
+        if (Math.abs(diff) < 0.01) return bloomRef.current
+        return prev + diff * 0.15
+      })
+    }, 16) // ~60fps
+    return () => clearInterval(id)
+  }, [])
+
   return (
     <>
       <ambientLight intensity={0.04} />
       <Stars />
       <Spherebody state={state} />
       <EnergyRibbons state={state} />
+      <BloomController state={state} bloomRef={bloomRef} />
       <EffectComposer>
         <Bloom
-          intensity={state === 'speaking' ? 3.2 : state === 'processing' ? 2.6 : state === 'listening' ? 2.0 : state === 'sleeping' ? 0.6 : 1.4}
+          intensity={bloomVal}
           luminanceThreshold={0.05}
           luminanceSmoothing={0.92}
           mipmapBlur
@@ -332,17 +395,21 @@ export default function VoiceOrb({
   return (
     <div onClick={onActivate} className="relative flex flex-col items-center select-none cursor-pointer">
       {/* Ambient glow behind canvas */}
-      <div
+      <motion.div
         className="absolute pointer-events-none"
-        style={{
-          inset: 0,
-          background: `radial-gradient(ellipse 65% 65% at 50% 50%,
-            rgba(167,139,250,${state==='speaking'?0.13:state==='listening'?0.10:state==='sleeping'?0.03:0.06}) 0%,
-            rgba(76,215,246,${state==='speaking'?0.08:state==='sleeping'?0.02:0.04}) 45%,
-            transparent 75%)`,
-          transition: 'all 1s ease',
-          zIndex: 0,
+        animate={{
+          background: state === 'speaking'
+            ? 'radial-gradient(ellipse 65% 65% at 50% 50%, rgba(167,139,250,0.13) 0%, rgba(76,215,246,0.08) 45%, transparent 75%)'
+            : state === 'listening'
+            ? 'radial-gradient(ellipse 65% 65% at 50% 50%, rgba(167,139,250,0.10) 0%, rgba(76,215,246,0.06) 45%, transparent 75%)'
+            : state === 'processing'
+            ? 'radial-gradient(ellipse 65% 65% at 50% 50%, rgba(192,132,252,0.12) 0%, rgba(167,139,250,0.05) 45%, transparent 75%)'
+            : state === 'sleeping'
+            ? 'radial-gradient(ellipse 65% 65% at 50% 50%, rgba(167,139,250,0.03) 0%, rgba(76,215,246,0.02) 45%, transparent 75%)'
+            : 'radial-gradient(ellipse 65% 65% at 50% 50%, rgba(167,139,250,0.06) 0%, rgba(76,215,246,0.04) 45%, transparent 75%)',
         }}
+        transition={{ duration: 1.8, ease: 'easeInOut' }}
+        style={{ inset: 0, zIndex: 0 }}
       />
 
       <Suspense fallback={
@@ -363,30 +430,47 @@ export default function VoiceOrb({
       </Suspense>
 
       {/* State label */}
-      <p
-        className="font-mono text-[11px] tracking-[0.22em] uppercase mt-1 transition-colors duration-700"
-        style={{ color: meta.color, zIndex: 2, position: 'relative' }}
-      >
-        {meta.label}
-      </p>
+      <AnimatePresence mode="wait">
+        <motion.p
+          key={state}
+          initial={{ opacity: 0, y: 6, filter: 'blur(4px)' }}
+          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+          exit={{   opacity: 0, y: -6, filter: 'blur(4px)' }}
+          transition={{ duration: 0.4, ease: 'easeInOut' }}
+          className="font-mono text-[11px] tracking-[0.22em] uppercase mt-1"
+          style={{ color: meta.color, zIndex: 2, position: 'relative' }}
+        >
+          {meta.label}
+        </motion.p>
+      </AnimatePresence>
 
       {/* Waveform bars for listening/speaking */}
-      {(state === 'listening' || state === 'speaking') && (
-        <div className="flex gap-[3px] mt-2 items-end h-6" style={{ zIndex: 2 }}>
-          {Array.from({ length: 14 }).map((_, i) => (
-            <div
-              key={i}
-              className="w-[3px] rounded-none"
-              style={{
-                background: i % 2 === 0 ? '#4cd7f6' : '#a78bfa',
-                height: `${30 + Math.random() * 70}%`,
-                animation: `waveform ${0.28 + Math.random() * 0.35}s ease-in-out infinite alternate`,
-                animationDelay: `${i * 0.04}s`,
-              }}
-            />
-          ))}
-        </div>
-      )}
+      <AnimatePresence>
+        {(state === 'listening' || state === 'speaking') && (
+          <motion.div
+            key="waveform"
+            initial={{ opacity: 0, scaleY: 0.3, y: 4 }}
+            animate={{ opacity: 1, scaleY: 1,   y: 0 }}
+            exit={{   opacity: 0, scaleY: 0.3,  y: 4 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            className="flex gap-[3px] mt-2 items-end h-6"
+            style={{ zIndex: 2 }}
+          >
+            {Array.from({ length: 14 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-[3px] rounded-none"
+                style={{
+                  background: i % 2 === 0 ? '#4cd7f6' : '#a78bfa',
+                  height: '60%',
+                  animation: `waveform ${0.28 + (i * 0.03)}s ease-in-out infinite alternate`,
+                  animationDelay: `${i * 0.04}s`,
+                }}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
