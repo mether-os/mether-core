@@ -1,5 +1,5 @@
 'use client'
-import { Suspense, useMemo, useRef, useState, useEffect } from 'react'
+import { Suspense, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
@@ -304,39 +304,21 @@ function EnergyRibbons({ state }: { state: string }) {
 }
 
 // ---- SCENE ----
-function BloomController({ 
-  state, 
-  bloomRef 
-}: { 
-  state: string
-  bloomRef: React.MutableRefObject<number>
-}) {
+function Scene({ state }: { state: string }) {
+  const bloomRef = useRef<any>(null)
+  const currentBloom = useRef(1.4)
+
   const targetMap: Record<string, number> = {
     sleeping: 0.6, idle: 1.4, listening: 2.0, processing: 2.6, speaking: 3.2
   }
 
   useFrame(() => {
-    const target = targetMap[state] ?? 1.4
-    bloomRef.current += (target - bloomRef.current) * 0.018
+    if (bloomRef.current) {
+      const target = targetMap[state] ?? 1.4
+      currentBloom.current += (target - currentBloom.current) * 0.018
+      bloomRef.current.intensity = currentBloom.current
+    }
   })
-
-  return null
-}
-
-function Scene({ state }: { state: string }) {
-  const [bloomVal, setBloomVal] = useState(1.4)
-  const bloomRef = useRef(1.4)
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setBloomVal(prev => {
-        const diff = bloomRef.current - prev
-        if (Math.abs(diff) < 0.01) return bloomRef.current
-        return prev + diff * 0.15
-      })
-    }, 16) // ~60fps
-    return () => clearInterval(id)
-  }, [])
 
   return (
     <>
@@ -344,10 +326,10 @@ function Scene({ state }: { state: string }) {
       <Stars />
       <Spherebody state={state} />
       <EnergyRibbons state={state} />
-      <BloomController state={state} bloomRef={bloomRef} />
       <EffectComposer>
         <Bloom
-          intensity={bloomVal}
+          ref={bloomRef}
+          intensity={1.4}
           luminanceThreshold={0.05}
           luminanceSmoothing={0.92}
           mipmapBlur
@@ -420,8 +402,8 @@ export default function VoiceOrb({
         <Canvas
           camera={{ position: [0, 0, 3.4], fov: 48 }}
           style={{ width: 380, height: 380, background: 'transparent', zIndex: 1 }}
-          gl={{ alpha: true, antialias: true, powerPreference: 'default' }}
-          dpr={[1, 2]}
+          gl={{ alpha: true, antialias: false, powerPreference: 'high-performance' }}
+          dpr={1}
           frameloop="always"
           performance={{ min: 0.5 }}
         >
