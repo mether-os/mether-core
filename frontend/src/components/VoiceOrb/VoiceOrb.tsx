@@ -1,7 +1,9 @@
-import { Suspense, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+'use client'
+import { Suspense, useMemo, useRef } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import * as THREE from 'three'
 import { useMetherStore } from '@/stores/metherStore'
-import ParticleSphere from './ParticleSphere'
 
 export type OrbState = 'sleeping' | 'idle' | 'listening' | 'processing' | 'speaking'
 
@@ -10,84 +12,381 @@ export interface VoiceOrbProps {
   onActivate?: () => void
 }
 
-const STATE_LABELS: Record<OrbState, string> = {
-  sleeping: 'SLEEPING',
-  idle: 'STANDBY',
-  listening: 'LISTENING',
-  processing: 'PROCESSING',
-  speaking: 'SPEAKING',
+// ---- STAR FIELD ----
+function Stars() {
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry()
+    const n = 1500
+    const pos = new Float32Array(n * 3)
+    const col = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) {
+      const r = 5 + Math.random() * 8
+      const t = Math.random() * Math.PI * 2
+      const p = Math.acos(2 * Math.random() - 1)
+      pos[i*3]   = r * Math.sin(p) * Math.cos(t)
+      pos[i*3+1] = r * Math.sin(p) * Math.sin(t)
+      pos[i*3+2] = r * Math.cos(p)
+      const isPink = Math.random() < 0.12
+      col[i*3]   = isPink ? 0.95 : 0.5 + Math.random() * 0.5
+      col[i*3+1] = isPink ? 0.2  : 0.6 + Math.random() * 0.4
+      col[i*3+2] = isPink ? 0.8  : 0.9 + Math.random() * 0.1
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    g.setAttribute('color',    new THREE.BufferAttribute(col, 3))
+    return g
+  }, [])
+
+  return (
+    <points geometry={geo}>
+      <pointsMaterial
+        size={0.018}
+        vertexColors
+        transparent
+        opacity={0.75}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+        sizeAttenuation
+      />
+    </points>
+  )
 }
 
-const STATE_COLORS: Record<OrbState, string> = {
-  sleeping: '#475569',
-  idle: '#4cd7f6',
-  listening: '#a78bfa',
-  processing: '#c084fc',
-  speaking: '#22d3ee',
+// ---- MAIN SPHERE BODY (fibonacci distribution, 10000 particles) ----
+function Spherebody({ state }: { state: string }) {
+  const ref = useRef<THREE.Points>(null!)
+  const matRef = useRef<THREE.ShaderMaterial>(null!)
+  const clock = useRef(0)
+
+  const { geo } = useMemo(() => {
+    const N = 10000
+    const pos   = new Float32Array(N * 3)
+    const col   = new Float32Array(N * 3)
+    const sizes = new Float32Array(N)
+    const phi   = Math.PI * (3 - Math.sqrt(5)) // golden angle
+
+    for (let i = 0; i < N; i++) {
+      const y     = 1 - (i / (N - 1)) * 2
+      const rad   = Math.sqrt(Math.max(0, 1 - y * y))
+      const theta = phi * i
+      const jitter = 0.06 * (Math.random() - 0.5)
+      const r = 1.0 + jitter
+
+      pos[i*3]   = Math.cos(theta) * rad * r
+      pos[i*3+1] = y * r
+      pos[i*3+2] = Math.sin(theta) * rad * r
+
+      // Color: cyan top, blue mid, purple bottom + pink accents
+      const h = (y + 1) / 2 // 0-1
+      const isAccent = Math.random() < 0.07
+
+      if (isAccent) {
+        col[i*3] = 0.88; col[i*3+1] = 0.15; col[i*3+2] = 0.85 // pink
+        sizes[i] = 0.014 + Math.random() * 0.008
+      } else if (h > 0.65) {
+        col[i*3] = 0.1;  col[i*3+1] = 0.82; col[i*3+2] = 0.95 // cyan
+        sizes[i] = 0.005 + Math.random() * 0.005
+      } else if (h > 0.35) {
+        col[i*3] = 0.18; col[i*3+1] = 0.35; col[i*3+2] = 0.92 // blue
+        sizes[i] = 0.004 + Math.random() * 0.006
+      } else {
+        col[i*3] = 0.55; col[i*3+1] = 0.12; col[i*3+2] = 0.82 // purple
+        sizes[i] = 0.005 + Math.random() * 0.007
+      }
+    }
+
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3))
+    geo.setAttribute('aSize',    new THREE.BufferAttribute(sizes, 1))
+    return { geo }
+  }, [])
+
+  const mat = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uTime:    { value: 0 },
+      uBreath:  { value: 1 },
+      uEnergy:  { value: 0.4 },
+    },
+    vertexShader: /* glsl */`
+      attribute float aSize;
+      attribute vec3 color;
+      varying   vec3 vCol;
+      uniform  float uTime;
+      uniform  float uBreath;
+      uniform  float uEnergy;
+
+      void main() {
+        vCol = color;
+        vec3 p = position * uBreath;
+
+        // Per-particle noise displacement
+        float noise =
+          sin(position.x * 4.0 + uTime * 0.6) *
+          cos(position.y * 4.0 + uTime * 0.5) *
+          sin(position.z * 3.5 + uTime * 0.7);
+        p += normalize(position) * noise * 0.035 * uEnergy;
+
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = aSize * (300.0 / -mv.z);
+        gl_Position  = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */`
+      varying vec3 vCol;
+      void main() {
+        vec2  c    = gl_PointCoord - 0.5;
+        float d    = length(c);
+        if (d > 0.5) discard;
+        float str  = pow(1.0 - d * 2.0, 1.8);
+        gl_FragColor = vec4(vCol, str * 0.92);
+      }
+    `,
+    transparent:  true,
+    depthWrite:   false,
+    blending:     THREE.AdditiveBlending,
+    vertexColors: true,
+  }), [])
+
+  matRef.current = mat
+
+  const speedMap: Record<string, number> = {
+    sleeping: 0.04, idle: 0.12, listening: 0.28, processing: 0.5, speaking: 0.38
+  }
+  const energyMap: Record<string, number> = {
+    sleeping: 0.15, idle: 0.4, listening: 0.75, processing: 0.95, speaking: 1.0
+  }
+
+  useFrame((_, dt) => {
+    clock.current += dt
+    const t = clock.current
+    const spd = speedMap[state] ?? 0.12
+    const eng = energyMap[state] ?? 0.4
+
+    ref.current.rotation.y += 0.004 * spd * 8
+    ref.current.rotation.x += 0.0015 * spd * 8
+
+    mat.uniforms.uTime.value   = t
+    mat.uniforms.uEnergy.value += (eng - mat.uniforms.uEnergy.value) * 0.03
+
+    // Breathing
+    let breath = 1 + Math.sin(t * 0.9) * 0.022
+    if (state === 'speaking') {
+      breath *= 1 + Math.sin(t * 11) * 0.035 + Math.sin(t * 7) * 0.018
+    }
+    mat.uniforms.uBreath.value = breath
+  })
+
+  // Cleanup geometries & shaders
+  useMemo(() => {
+    return () => {
+      geo.dispose()
+      mat.dispose()
+    }
+  }, [geo, mat])
+
+  return <points ref={ref} geometry={geo} material={mat} frustumCulled={false} />
 }
 
-export default function VoiceOrb({ state: propState, onActivate }: VoiceOrbProps) {
-  const storeState = useMetherStore(s => s.orbState) as OrbState
-  const state = propState ?? storeState
+// ---- ENERGY RIBBONS ----
+function Ribbon({
+  tiltX, tiltZ, speed, phaseOffset, color1, color2, particleCount, state
+}: {
+  tiltX: number; tiltZ: number; speed: number; phaseOffset: number
+  color1: string; color2: string; particleCount: number; state: string
+}) {
+  const ref   = useRef<THREE.Points>(null!)
+  const matRef = useRef<THREE.PointsMaterial>(null!)
+  const t = useRef(phaseOffset)
 
-  // Detect WebGL support
+  const geo = useMemo(() => {
+    const N   = particleCount
+    const pos = new Float32Array(N * 3)
+    const col = new Float32Array(N * 3)
+    const c1  = new THREE.Color(color1)
+    const c2  = new THREE.Color(color2)
+
+    for (let i = 0; i < N; i++) {
+      const angle    = (i / N) * Math.PI * 2
+      const bandW    = (Math.random() - 0.5) * 0.14
+      const r        = 1.03 + Math.abs(bandW) * 0.5
+      pos[i*3]   = Math.cos(angle) * r
+      pos[i*3+1] = bandW * 2.5 + Math.sin(angle * 2) * 0.06
+      pos[i*3+2] = Math.sin(angle) * r
+
+      const edge = Math.abs(bandW) / 0.07
+      const c    = c1.clone().lerp(c2, Math.min(1, edge))
+      col[i*3] = c.r; col[i*3+1] = c.g; col[i*3+2] = c.b
+    }
+
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    g.setAttribute('color',    new THREE.BufferAttribute(col, 3))
+    return g
+  }, [particleCount, color1, color2])
+
+  const mat = useMemo(() => new THREE.PointsMaterial({
+    size: 0.009,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  }), [])
+
+  matRef.current = mat
+
+  const spdMap: Record<string,number> = {
+    sleeping:0.3, idle:0.9, listening:1.6, processing:2.4, speaking:2.0
+  }
+
+  useFrame((_, dt) => {
+    t.current += dt * speed * (spdMap[state] ?? 1)
+    ref.current.rotation.set(tiltX, t.current, tiltZ)
+    const pulse = 0.7 + 0.3 * Math.sin(t.current * 2.5)
+    mat.opacity = 0.85 * pulse
+    if (state === 'speaking') mat.opacity = 0.9 + 0.1 * Math.sin(t.current * 9)
+  })
+
+  // Cleanup
+  useMemo(() => {
+    return () => {
+      geo.dispose()
+      mat.dispose()
+    }
+  }, [geo, mat])
+
+  return <points ref={ref} geometry={geo} material={mat} frustumCulled={false} />
+}
+
+function EnergyRibbons({ state }: { state: string }) {
+  const ribbons = [
+    { tiltX:  0.45, tiltZ:  0.20, speed:  0.80, phaseOffset: 0,            color1: '#c084fc', color2: '#f0abfc', particleCount: 2500 },
+    { tiltX: -0.55, tiltZ:  0.65, speed: -0.62, phaseOffset: Math.PI*0.7,  color1: '#06b6d4', color2: '#a78bfa', particleCount: 2000 },
+    { tiltX:  0.80, tiltZ: -0.30, speed:  0.50, phaseOffset: Math.PI*1.4,  color1: '#e879f9', color2: '#c084fc', particleCount: 1600 },
+  ]
+  return (
+    <group>
+      {ribbons.map((r, i) => (
+        <Ribbon key={i} {...r} state={state} />
+      ))}
+    </group>
+  )
+}
+
+// ---- SCENE ----
+function Scene({ state }: { state: string }) {
+  return (
+    <>
+      <ambientLight intensity={0.04} />
+      <Stars />
+      <Spherebody state={state} />
+      <EnergyRibbons state={state} />
+      <EffectComposer>
+        <Bloom
+          intensity={state === 'speaking' ? 3.2 : state === 'processing' ? 2.6 : state === 'listening' ? 2.0 : state === 'sleeping' ? 0.6 : 1.4}
+          luminanceThreshold={0.05}
+          luminanceSmoothing={0.92}
+          mipmapBlur
+          radius={0.85}
+        />
+      </EffectComposer>
+    </>
+  )
+}
+
+// ---- STATE LABEL ----
+const STATE_META: Record<string, { label: string; color: string }> = {
+  sleeping:   { label: ':: SLEEPING',   color: '#475569' },
+  idle:       { label: ':: STANDBY',    color: '#4cd7f6' },
+  listening:  { label: ':: LISTENING',  color: '#a78bfa' },
+  processing: { label: ':: PROCESSING', color: '#c084fc' },
+  speaking:   { label: ':: SPEAKING',   color: '#22d3ee' },
+}
+
+// ---- MAIN EXPORT ----
+export default function VoiceOrb({
+  state: propState,
+  onActivate
+}: VoiceOrbProps) {
+  const storeState = useMetherStore(s => s.orbState)
+  const state = propState ?? storeState ?? 'idle'
+  const meta  = STATE_META[state] ?? STATE_META.idle
+
   const hasWebGL = useMemo(() => {
     try {
-      const canvas = document.createElement('canvas')
-      return !!(
-        window.WebGLRenderingContext &&
-        (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
-      )
+      const c = document.createElement('canvas')
+      return !!(window.WebGLRenderingContext &&
+        (c.getContext('webgl') || c.getContext('experimental-webgl')))
     } catch { return false }
   }, [])
 
   if (!hasWebGL) {
     return (
       <div className="flex items-center justify-center w-80 h-80">
-        <div className="hud-label">:: WEBGL UNAVAILABLE</div>
+        <p className="hud-label">:: WEBGL UNAVAILABLE</p>
       </div>
     )
   }
 
   return (
-    <div className="relative flex flex-col items-center">
-      <div 
-        className="relative w-[360px] h-[360px] flex items-center justify-center cursor-pointer"
-        onClick={onActivate}
-      >
-        <Suspense fallback={
-          <div className="w-80 h-80 flex items-center justify-center">
-            <div className="hud-label animate-pulse">:: INITIALIZING CORE...</div>
-          </div>
-        }>
-          <ParticleSphere state={state} />
-        </Suspense>
-      </div>
+    <div onClick={onActivate} className="relative flex flex-col items-center select-none cursor-pointer">
+      {/* Ambient glow behind canvas */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          inset: 0,
+          background: `radial-gradient(ellipse 65% 65% at 50% 50%,
+            rgba(167,139,250,${state==='speaking'?0.13:state==='listening'?0.10:state==='sleeping'?0.03:0.06}) 0%,
+            rgba(76,215,246,${state==='speaking'?0.08:state==='sleeping'?0.02:0.04}) 45%,
+            transparent 75%)`,
+          transition: 'all 1s ease',
+          zIndex: 0,
+        }}
+      />
 
-      {/* State label below orb */}
-      <div className="mt-4 flex flex-col items-center">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={state}
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5 }}
-            transition={{ duration: 0.3 }}
-            className="text-[11px] font-mono tracking-[0.2em] font-bold select-none pointer-events-none"
-            style={{ color: STATE_COLORS[state] }}
-          >
-            :: {STATE_LABELS[state]}
-            {state === 'processing' && (
-              <motion.span
-                animate={{ opacity: [0, 1, 0] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-              >
-                ...
-              </motion.span>
-            )}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+      <Suspense fallback={
+        <div className="w-[380px] h-[380px] flex items-center justify-center">
+          <p className="hud-label animate-pulse">:: INITIALIZING CORE...</p>
+        </div>
+      }>
+        <Canvas
+          camera={{ position: [0, 0, 3.4], fov: 48 }}
+          style={{ width: 380, height: 380, background: 'transparent', zIndex: 1 }}
+          gl={{ alpha: true, antialias: true, powerPreference: 'default' }}
+          dpr={[1, 2]}
+          frameloop="always"
+          performance={{ min: 0.5 }}
+        >
+          <Scene state={state} />
+        </Canvas>
+      </Suspense>
+
+      {/* State label */}
+      <p
+        className="font-mono text-[11px] tracking-[0.22em] uppercase mt-1 transition-colors duration-700"
+        style={{ color: meta.color, zIndex: 2, position: 'relative' }}
+      >
+        {meta.label}
+      </p>
+
+      {/* Waveform bars for listening/speaking */}
+      {(state === 'listening' || state === 'speaking') && (
+        <div className="flex gap-[3px] mt-2 items-end h-6" style={{ zIndex: 2 }}>
+          {Array.from({ length: 14 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-[3px] rounded-none"
+              style={{
+                background: i % 2 === 0 ? '#4cd7f6' : '#a78bfa',
+                height: `${30 + Math.random() * 70}%`,
+                animation: `waveform ${0.28 + Math.random() * 0.35}s ease-in-out infinite alternate`,
+                animationDelay: `${i * 0.04}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

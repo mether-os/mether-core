@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useCallback } from "react";
 import HUDLayout from "@/layouts/HUDLayout";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { CommandInput } from "@/components/CommandInput";
@@ -7,7 +7,7 @@ import LeftPanel, { AgentLog } from "@/components/panels/LeftPanel";
 import RightPanel from "@/components/panels/RightPanel";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useMetherStore } from "@/stores/metherStore";
-import type { OrbState } from "@/stores/metherStore";
+import { useOrbCycle } from "@/hooks/useOrbCycle";
 
 class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: Error | null}> {
   constructor(props: {children: React.ReactNode}) {
@@ -62,24 +62,7 @@ function App() {
   const incrementStat = useMetherStore((s) => s.incrementStat);
 
   /* ── Demo mode: auto-cycle orb states ── */
-  useEffect(() => {
-    if (voiceStatus === "online") {
-      setDemo(false);
-      return;
-    }
-    if (!isDemo) return;
-
-    const sequence: OrbState[] = ["idle", "listening", "processing", "speaking"];
-    let idx = 0;
-    setOrbState(sequence[idx]);
-
-    const id = setInterval(() => {
-      idx = (idx + 1) % sequence.length;
-      setOrbState(sequence[idx]);
-    }, 4000);
-
-    return () => clearInterval(id);
-  }, [isDemo, setOrbState, voiceStatus, setDemo]);
+  useOrbCycle();
 
   /* ── Orb click → toggle listen ── */
   const handleOrbActivate = useCallback(() => {
