@@ -734,3 +734,34 @@ body {
     height: 40px !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   SHIMMER — Animated gradient border line
+   ═══════════════════════════════════════════════════════════ */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SCAN DOWN — Full-screen scan line overlay
+   ═══════════════════════════════════════════════════════════ */
+@keyframes scanDown {
+  0%   { top: -80px; }
+  100% { top: 100vh; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CORNER BRACKET GLOW — Subtle glow on panel corners
+   ═══════════════════════════════════════════════════════════ */
+.hud-corner-bracket::before {
+  box-shadow: -2px -2px 8px rgba(76,215,246,0.15) !important;
+}
+
+.hud-corner-bracket::after {
+  box-shadow: 2px 2px 8px rgba(76,215,246,0.15) !important;
+}
+
+.hud-panel {
+  background-color: rgba(76,215,246,0.015);
+}

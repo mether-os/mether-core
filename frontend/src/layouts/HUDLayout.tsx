@@ -56,8 +56,7 @@ function TopBar() {
                  bg-surface-container select-none"
       style={{
         height: TOP_BAR_H,
-        borderBottom: "1px solid rgba(76,215,246,0.12)",
-        boxShadow: "0 1px 20px rgba(76,215,246,0.04)",
+        borderBottom: 'none',
       }}
     >
       {/* ── Left: System ID + status dots ── */}
@@ -109,6 +108,15 @@ function TopBar() {
           SYNC
         </span>
       </div>
+      {/* Animated shimmer gradient line */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none"
+        style={{
+          background: 'linear-gradient(90deg, transparent 0%, rgba(76,215,246,0.6) 30%, rgba(139,92,246,0.8) 50%, rgba(76,215,246,0.6) 70%, transparent 100%)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 3s linear infinite',
+        }}
+      />
     </header>
   );
 }
@@ -226,7 +234,7 @@ function CenterViewport({ children }: { children?: ReactNode }) {
   return (
     <main
       id="hud-center-viewport"
-      className="fixed z-30 flex items-center justify-center overflow-visible left-0 right-0 md:left-[260px] md:right-[260px]"
+      className="fixed z-30 flex items-center justify-center overflow-hidden left-0 right-0 md:left-[260px] md:right-[260px]"
       style={{
         top: TOP_BAR_H,
         bottom: BOTTOM_TOTAL,
@@ -311,6 +319,15 @@ export default function HUDLayout({
           background: "linear-gradient(90deg, transparent 0%, rgba(76, 215, 246, 0.15) 30%, rgba(76, 215, 246, 0.3) 50%, rgba(76, 215, 246, 0.15) 70%, transparent 100%)",
           animation: "scan 16s linear infinite reverse",
           opacity: 0.03,
+        }}
+      />
+      {/* ── Global scan line overlay ── */}
+      <div
+        className="fixed left-0 right-0 pointer-events-none z-[1000]"
+        style={{
+          height: '80px',
+          background: 'linear-gradient(transparent, rgba(76,215,246,0.04), transparent)',
+          animation: 'scanDown 8s linear infinite',
         }}
       />
       {/* ── Edge bars ── */}

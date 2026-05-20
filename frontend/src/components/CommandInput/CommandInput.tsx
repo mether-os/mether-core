@@ -114,7 +114,9 @@ export default function CommandInput({
       style={{ 
         bottom: 32, 
         height: 48,
-        boxShadow: isFocused ? "0 -4px 16px rgba(76,215,246,0.1)" : "none",
+        boxShadow: isFocused
+          ? "0 0 0 1px rgba(76,215,246,0.4), 0 0 20px rgba(76,215,246,0.15), inset 0 0 20px rgba(76,215,246,0.05)"
+          : "none",
         transition: "box-shadow 0.2s ease"
       }}
     >
@@ -162,10 +164,14 @@ export default function CommandInput({
         {isFocused && (
           <motion.span
             animate={{ opacity: [1, 0] }}
-            transition={{ repeat: Infinity, duration: 0.8, ease: "linear", repeatType: "reverse" }}
-            className="absolute top-1/2 -translate-y-1/2 w-[8px] h-[14px] bg-primary/80 pointer-events-none"
+            transition={{ repeat: Infinity, duration: 1, ease: "linear", repeatType: "reverse" }}
+            className="absolute top-1/2 -translate-y-1/2 pointer-events-none"
             style={{
               left: `${value.length * 8.4 + 1}px`,
+              width: '2px',
+              height: '14px',
+              background: '#4cd7f6',
+              boxShadow: '0 0 8px rgba(76,215,246,0.8)',
             }}
           />
         )}
