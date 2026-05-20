@@ -305,18 +305,22 @@ function EnergyRibbons({ state }: { state: string }) {
 
 // ---- SCENE ----
 function Scene({ state }: { state: string }) {
-  const bloomRef = useRef<any>(null)
+  const bloomEffectRef = useRef<any>(null)
   const currentBloom = useRef(1.4)
+
+  const setBloomRef = useMemo(() => (node: any) => {
+    bloomEffectRef.current = node
+  }, [])
 
   const targetMap: Record<string, number> = {
     sleeping: 0.6, idle: 1.4, listening: 2.0, processing: 2.6, speaking: 3.2
   }
 
   useFrame(() => {
-    if (bloomRef.current) {
+    if (bloomEffectRef.current) {
       const target = targetMap[state] ?? 1.4
       currentBloom.current += (target - currentBloom.current) * 0.018
-      bloomRef.current.intensity = currentBloom.current
+      bloomEffectRef.current.intensity = currentBloom.current
     }
   })
 
@@ -328,7 +332,7 @@ function Scene({ state }: { state: string }) {
       <EnergyRibbons state={state} />
       <EffectComposer>
         <Bloom
-          ref={bloomRef}
+          ref={setBloomRef}
           intensity={1.4}
           luminanceThreshold={0.05}
           luminanceSmoothing={0.92}

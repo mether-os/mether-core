@@ -3,6 +3,26 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMetherStore } from "@/stores/metherStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
+function renderValue(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (typeof value === "object") {
+    try {
+      const seen = new WeakSet();
+      return JSON.stringify(value, (_key, val) => {
+        if (typeof val === "object" && val !== null) {
+          if (seen.has(val)) return "[Circular]";
+          seen.add(val);
+        }
+        return val;
+      });
+    } catch {
+      return "[Object]";
+    }
+  }
+  return String(value);
+}
+
 export function ConfirmDialog() {
   const pendingConfirmation = useMetherStore((s) => s.pendingConfirmation);
   const setPendingConfirmation = useMetherStore((s) => s.setPendingConfirmation);
@@ -94,7 +114,7 @@ export function ConfirmDialog() {
               {Object.entries(pendingConfirmation.params).map(([key, value]) => (
                 <div key={key} className="flex gap-2">
                   <span className="text-outline">{key}:</span>
-                  <span className="break-all">{JSON.stringify(value)}</span>
+                  <span className="break-all">{renderValue(value)}</span>
                 </div>
               ))}
             </div>
