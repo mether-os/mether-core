@@ -237,16 +237,38 @@ export function AgentLog() {
 }
 
 /* ── Log line ── */
+const MODULE_BORDER_COLORS: Record<string, string> = {
+  VOICE: 'rgba(139,92,246,0.8)',
+  AGENT: 'rgba(76,215,246,0.8)',
+  WS: 'rgba(16,185,129,0.6)',
+  TOOL: 'rgba(245,158,11,0.7)',
+  LLM: 'rgba(76,215,246,0.5)',
+  MEMORY: 'rgba(139,92,246,0.5)',
+  SYSTEM: 'rgba(148,163,184,0.4)',
+  CMD: 'rgba(76,215,246,0.6)',
+  METHER: 'rgba(76,215,246,0.7)',
+  WA: 'rgba(16,185,129,0.7)',
+  WA_AUTO: 'rgba(16,185,129,0.5)',
+  GMAIL: 'rgba(96,165,250,0.6)',
+  CAL: 'rgba(74,222,128,0.6)',
+  DRIVE: 'rgba(167,139,250,0.6)',
+}
+
 function LogLine({ entry }: { entry: { id: number; time: string; module: string; message: string } }) {
   const moduleColor = MODULE_COLORS[entry.module] ?? "text-outline";
+  const borderColor = MODULE_BORDER_COLORS[entry.module] ?? 'rgba(148,163,184,0.3)';
 
   return (
     <motion.div
       initial={{ opacity: 0, x: -4 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.25 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
       className="text-[9px] font-mono leading-[1.7] flex gap-[6px] items-center log-entry-hover px-1 -mx-1 rounded-sm overflow-hidden text-ellipsis"
       title={`[${entry.time}] [${entry.module}] ${entry.message}`}
+      style={{
+        borderLeft: `2px solid ${borderColor}`,
+        paddingLeft: '6px',
+      }}
     >
       <span className="shrink-0" style={{ color: "rgba(76, 215, 246, 0.3)", minWidth: "60px" }}>
         [{entry.time}]
