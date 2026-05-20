@@ -1,6 +1,6 @@
 import React, { useCallback } from "react";
 import HUDLayout from "@/layouts/HUDLayout";
-import { VoiceOrb } from "@/components/VoiceOrb";
+import METHERCore from "@/components/METHERCore/METHERCore";
 import { CommandInput } from "@/components/CommandInput";
 import { ResponseDisplay } from "@/components/ResponseDisplay";
 import LeftPanel, { AgentLog } from "@/components/panels/LeftPanel";
@@ -100,7 +100,7 @@ function App() {
       }
     >
       <div className="flex flex-col items-center justify-center w-full h-full">
-        <VoiceOrb 
+        <METHERCore 
           state={(voiceStatus === "offline" && !isDemo && orbState === "idle") ? "sleeping" : orbState} 
           onActivate={handleOrbActivate} 
         />
