@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";
 
@@ -74,20 +75,25 @@ function SegmentedBar({ value, max = 100 }: { value: number; max?: number }) {
 
   return (
     <div className="flex items-center gap-[2px]">
-      {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
-        <div
-          key={i}
-          className={`w-[6px] h-[6px] transition-colors duration-300 ${
-            i < filled
-              ? value > 80
-                ? "bg-error/80"
-                : value > 60
-                  ? "bg-warning/70"
-                  : "bg-primary/60"
-              : "bg-outline-variant/20"
-          }`}
-        />
-      ))}
+      {Array.from({ length: SEGMENT_COUNT }, (_, i) => {
+        const isActive = i < filled;
+        const isLastActive = isActive && i === filled - 1;
+
+        return (
+          <div
+            key={i}
+            className="w-[6px] h-[6px] transition-all duration-300"
+            style={{
+              background: isActive 
+                ? "linear-gradient(90deg, #4cd7f6, #06b6d4)" 
+                : "rgba(148, 163, 184, 0.2)",
+              boxShadow: isLastActive 
+                ? "2px 0 6px rgba(76, 215, 246, 0.6)" 
+                : "none",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -119,7 +125,10 @@ function MetricRow({ label, value, bar, blinkDot }: MetricRowProps) {
 
       {bar !== undefined && <SegmentedBar value={bar} />}
 
-      <span className="text-data-mono text-primary font-bold tracking-wider text-right min-w-[38px]">
+      <span 
+        className="text-data-mono tracking-wider text-right min-w-[38px]"
+        style={{ color: "#4cd7f6", fontWeight: 700 }}
+      >
         {value}
       </span>
     </div>
@@ -232,16 +241,23 @@ function LogLine({ entry }: { entry: { id: number; time: string; module: string;
   const moduleColor = MODULE_COLORS[entry.module] ?? "text-outline";
 
   return (
-    <div
-      className="text-[9px] font-mono leading-[1.7] whitespace-nowrap
-                 overflow-hidden text-ellipsis animate-type-in log-entry-hover
-                 px-1 -mx-1 rounded-sm"
+    <motion.div
+      initial={{ opacity: 0, x: -4 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.25 }}
+      className="text-[9px] font-mono leading-[1.7] flex gap-[6px] items-center log-entry-hover px-1 -mx-1 rounded-sm overflow-hidden text-ellipsis"
       title={`[${entry.time}] [${entry.module}] ${entry.message}`}
     >
-      <span className="text-outline-variant">[{entry.time}]</span>{" "}
-      <span className={`${moduleColor} font-bold`}>[{entry.module}]</span>{" "}
-      <span className="text-on-surface-variant">{entry.message}</span>
-    </div>
+      <span className="shrink-0" style={{ color: "rgba(76, 215, 246, 0.3)", minWidth: "60px" }}>
+        [{entry.time}]
+      </span>{" "}
+      <span className={`${moduleColor} shrink-0 font-bold`} style={{ width: "52px" }}>
+        [{entry.module}]
+      </span>{" "}
+      <span className="truncate flex-1" style={{ color: "rgba(76, 215, 246, 0.65)" }}>
+        {entry.message}
+      </span>
+    </motion.div>
   );
 }
 
@@ -269,7 +285,13 @@ const LeftPanel = () => {
   const dismissSummary = useMetherStore(s => s.dismissSummary);
 
   return (
-    <div className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container">
+    <div 
+      className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container"
+      style={{
+        borderRight: "1px solid rgba(76,215,246,0.12)",
+        boxShadow: "inset -1px 0 12px rgba(76,215,246,0.03)",
+      }}
+    >
       <span className="hud-corner-bracket--extra absolute inset-0 pointer-events-none" />
 
       <SystemVitals />

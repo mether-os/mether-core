@@ -37,14 +37,25 @@ function SegmentedBar({ value, max = 100 }: { value: number; max?: number }) {
 
   return (
     <div className="flex items-center gap-[2px]">
-      {Array.from({ length: SEGMENT_COUNT }, (_, i) => (
-        <div
-          key={i}
-          className={`w-[5px] h-[5px] transition-colors duration-300 ${
-            i < filled ? "bg-primary/70" : "bg-outline-variant/20"
-          }`}
-        />
-      ))}
+      {Array.from({ length: SEGMENT_COUNT }, (_, i) => {
+        const isActive = i < filled;
+        const isLastActive = isActive && i === filled - 1;
+
+        return (
+          <div
+            key={i}
+            className="w-[5px] h-[5px] transition-all duration-300"
+            style={{
+              background: isActive 
+                ? "linear-gradient(90deg, #4cd7f6, #06b6d4)" 
+                : "rgba(148, 163, 184, 0.2)",
+              boxShadow: isLastActive 
+                ? "2px 0 6px rgba(76, 215, 246, 0.6)" 
+                : "none",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -116,12 +127,12 @@ function ProximityRadar() {
             {/* Sweep trail gradient */}
             <linearGradient id="sweepGrad" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor="rgba(76, 215, 246, 0)" />
-              <stop offset="100%" stopColor="rgba(76, 215, 246, 0.25)" />
+              <stop offset="100%" stopColor="rgba(76, 215, 246, 0.3)" />
             </linearGradient>
 
             {/* Blip glow filter */}
             <filter id="blipGlow">
-              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feGaussianBlur stdDeviation="1.5" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
@@ -233,12 +244,9 @@ function ProximityRadar() {
             const brightness = angleDiff < 30 ? 1 : Math.max(0.15, 1 - angleDiff / 180);
 
             return (
-              <rect
+              <polygon
                 key={blip.id}
-                x={bx - 2.5}
-                y={by - 2.5}
-                width="5"
-                height="5"
+                points={`${bx},${by - 4} ${bx + 4},${by} ${bx},${by + 4} ${bx - 4},${by}`}
                 fill={`rgba(76, 215, 246, ${brightness})`}
                 filter={brightness > 0.5 ? "url(#blipGlow)" : undefined}
               />
@@ -269,9 +277,9 @@ const OBJECTIVES: Objective[] = [
 function ObjectiveItem({ obj }: { obj: Objective }) {
   const chipClass =
     obj.status === "IN PROGRESS"
-      ? "hud-chip"
+      ? "hud-chip hud-chip--success"
       : obj.status === "COMPLETE"
-        ? "hud-chip hud-chip--success"
+        ? "hud-chip hud-chip--success font-bold"
         : "hud-chip hud-chip--warning";
 
   return (
@@ -355,16 +363,24 @@ function StatRow({
       <span className="text-data-mono text-outline tracking-[0.08em] uppercase">
         {label}
       </span>
-      <span
-        className={`text-data-mono font-bold tracking-wider ${
-          blink
-            ? "text-success"
-            : "text-primary"
-        }`}
-        style={blink ? { animation: "breathe 1.5s ease-in-out infinite" } : undefined}
-      >
-        {value}
-      </span>
+      <div className="flex items-center gap-1.5">
+        {blink && (
+          <span 
+            className="w-1.5 h-1.5 rounded-full bg-success animate-pulse"
+            style={{ boxShadow: "0 0 6px rgba(34,197,94,0.6)" }}
+          />
+        )}
+        <span
+          className={`text-data-mono font-bold tracking-wider ${
+            blink
+              ? "text-success"
+              : "text-primary"
+          }`}
+          style={blink ? { animation: "breathe 1.5s ease-in-out infinite" } : undefined}
+        >
+          {value}
+        </span>
+      </div>
     </div>
   );
 }
@@ -459,7 +475,14 @@ function GoogleServices() {
    ═══════════════════════════════════════════════════════════════ */
 const RightPanel = () => {
   return (
-    <div className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+    <div 
+      className="hud-panel hud-corner-bracket flex-1 flex flex-col min-h-0 !p-3 bg-surface-container overflow-y-auto" 
+      style={{ 
+        scrollbarWidth: "none",
+        borderLeft: "1px solid rgba(76,215,246,0.12)",
+        boxShadow: "inset 1px 0 12px rgba(76,215,246,0.03)",
+      }}
+    >
       {/* Extra corners (top-right + bottom-left) */}
       <span className="hud-corner-bracket--extra absolute inset-0 pointer-events-none" />
 

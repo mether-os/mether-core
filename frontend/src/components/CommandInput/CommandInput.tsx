@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from "react";
 import { Send, Mic } from "lucide-react";
+import { motion } from "framer-motion";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Command Input Bar
@@ -110,7 +111,12 @@ export default function CommandInput({
       className={`fixed left-0 right-0 z-50 flex items-center gap-3 px-4
                  bg-surface-container-low border-t border-primary/15 select-none
                  ${flashKey > 0 ? "cmd-flash" : ""}`}
-      style={{ bottom: 32, height: 48 }}
+      style={{ 
+        bottom: 32, 
+        height: 48,
+        boxShadow: isFocused ? "0 -4px 16px rgba(76,215,246,0.1)" : "none",
+        transition: "box-shadow 0.2s ease"
+      }}
     >
       {/* ── Prompt prefix ── */}
       <span className="text-label-caps text-primary text-glow-cyan tracking-[0.12em] shrink-0 text-[11px]">
@@ -154,11 +160,12 @@ export default function CommandInput({
 
         {/* Blinking block cursor */}
         {isFocused && (
-          <span
+          <motion.span
+            animate={{ opacity: [1, 0] }}
+            transition={{ repeat: Infinity, duration: 0.8, ease: "linear", repeatType: "reverse" }}
             className="absolute top-1/2 -translate-y-1/2 w-[8px] h-[14px] bg-primary/80 pointer-events-none"
             style={{
               left: `${value.length * 8.4 + 1}px`,
-              animation: "flicker 1s steps(2) infinite",
             }}
           />
         )}
@@ -183,7 +190,7 @@ export default function CommandInput({
         type="button"
         onClick={handleSubmit}
         disabled={!value.trim()}
-        className="hud-button !py-1.5 !px-3 !text-[9px]"
+        className="hud-button !py-1.5 !px-3 !text-[9px] hover:!bg-primary hover:!text-void transition-colors duration-200"
       >
         <span className="hidden md:inline">EXECUTE</span>
         <Send size={12} className="md:ml-1" />
