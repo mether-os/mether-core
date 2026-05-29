@@ -17,7 +17,8 @@ const STATE_CONFIG: Record<string, { distort: number; speed: number; color: stri
 
 export default function CoreSphere({ state }: CoreSphereProps) {
   const meshRef = useRef<THREE.Mesh>(null!)
-  const materialRef = useRef<THREE.Material & { color: THREE.Color; emissive: THREE.Color }>(null!)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const materialRef = useRef<any>(null!)
   const timeRef = useRef(0)
 
   const targetColor = useMemo(() => new THREE.Color(), [])
