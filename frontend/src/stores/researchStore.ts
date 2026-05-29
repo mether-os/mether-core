@@ -13,6 +13,32 @@ export interface ResearchTaskState {
   error_message: string | null;
 }
 
+export interface ResearchSectionState {
+  id: number;
+  task_id: string;
+  title: string;
+  order_idx: number;
+  status: "pending" | "in_progress" | "completed" | "failed";
+  instructions: string | null;
+  content: string | null;
+  validated_content: string | null;
+}
+
+export interface ResearchSourceState {
+  id: number;
+  task_id: string;
+  url: string;
+  title: string | null;
+  snippet: string | null;
+  source_type: string;
+  publication_date: string | null;
+  author: string | null;
+  domain: string | null;
+  credibility_score: number;
+  trust_score: number;
+  extracted_facts?: string;
+}
+
 interface ResearchStore {
   isOpen: boolean;
   setOpen: (open: boolean) => void;
@@ -20,10 +46,10 @@ interface ResearchStore {
   setActiveTaskId: (id: string | null) => void;
   taskState: ResearchTaskState | null;
   setTaskState: (state: ResearchTaskState | null) => void;
-  sections: any[];
-  setSections: (sections: any[]) => void;
-  sources: any[];
-  setSources: (sources: any[]) => void;
+  sections: ResearchSectionState[];
+  setSections: (sections: ResearchSectionState[]) => void;
+  sources: ResearchSourceState[];
+  setSources: (sources: ResearchSourceState[]) => void;
   progressMessage: string;
   setProgressMessage: (msg: string) => void;
 }

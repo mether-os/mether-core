@@ -305,10 +305,10 @@ function EnergyRibbons({ state }: { state: string }) {
 
 // ---- SCENE ----
 function Scene({ state }: { state: string }) {
-  const bloomEffectRef = useRef<any>(null)
+  const bloomEffectRef = useRef<(THREE.Object3D & { intensity: number }) | null>(null)
   const currentBloom = useRef(1.4)
 
-  const setBloomRef = useMemo(() => (node: any) => {
+  const setBloomRef = useMemo(() => (node: (THREE.Object3D & { intensity: number }) | null) => {
     bloomEffectRef.current = node
   }, [])
 

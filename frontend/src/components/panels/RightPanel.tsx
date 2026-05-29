@@ -347,7 +347,7 @@ function ActiveObjectives() {
             setObjectives(data.objectives);
           }
         }
-      } catch (err) {
+      } catch {
         // Backend offline
       }
     };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useResearchStore } from "@/stores/researchStore";
+import { useResearchStore, type ResearchSectionState } from "@/stores/researchStore";
 import config from "../../config";
 
 export function ResearchDashboardModal() {
@@ -25,11 +25,12 @@ export function ResearchDashboardModal() {
   const [format, setFormat] = useState("Markdown");
   
   // Section edit helper
-  const [editedSections, setEditedSections] = useState<any[]>([]);
+  const [editedSections, setEditedSections] = useState<ResearchSectionState[]>([]);
   const [regenInstructions, setRegenInstructions] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (taskState?.stage === "awaiting_outline_approval") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditedSections([...sections]);
     }
   }, [sections, taskState?.stage]);

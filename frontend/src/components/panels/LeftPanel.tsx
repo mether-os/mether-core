@@ -173,7 +173,7 @@ function SystemVitals() {
           setRam(data.ram);
           setLatency(Date.now() - start);
         }
-      } catch (err) {
+      } catch {
         // Backend offline
       }
     };
