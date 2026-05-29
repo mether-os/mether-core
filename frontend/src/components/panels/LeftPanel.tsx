@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";
+import config from "../../config";
 
 /* ═══════════════════════════════════════════════════════════════
    METHER OS — Left Panel
@@ -15,7 +16,6 @@ import { useMetherStore } from "@/stores/metherStore";
 const SEGMENT_COUNT = 10;
 const MAX_LOG_DISPLAY = 20;
 const LOG_INTERVAL_MS = 1500;
-const VITALS_INTERVAL_MS = 2000;
 
 /* ── Log message pool (demo mode) ── */
 const LOG_POOL: [string, string][] = [
@@ -50,9 +50,6 @@ const MODULE_COLORS: Record<string, string> = {
 };
 
 /* ── Helpers ── */
-function randomInRange(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
 
 /* ═══════════════════════════════════════════════════════════════
    SECTION HEADER
@@ -143,13 +140,46 @@ function SystemVitals() {
   const [cpu, setCpu] = useState(32);
   const [ram, setRam] = useState(45);
   const [latency, setLatency] = useState(38);
+  const activeModel = useMetherStore((s) => s.activeModel);
+  const setActiveModel = useMetherStore((s) => s.setActiveModel);
 
+  // Fetch the active model name from the backend once on mount
   useEffect(() => {
-    const id = setInterval(() => {
-      setCpu((prev) => Math.max(5, Math.min(95, prev + randomInRange(-8, 8))));
-      setRam((prev) => Math.max(20, Math.min(90, prev + randomInRange(-5, 5))));
-      setLatency(randomInRange(18, 120));
-    }, VITALS_INTERVAL_MS);
+    const headers: Record<string, string> = {};
+    if (config.apiKey) {
+      headers["X-METHER-KEY"] = config.apiKey;
+    }
+    fetch(`${config.backendUrl}/api/v1/status`, { headers })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.model) setActiveModel(data.model);
+      })
+      .catch(() => { /* backend not ready yet — keep placeholder */ });
+  }, [setActiveModel]);
+
+  // Poll real vitals from backend
+  useEffect(() => {
+    const fetchVitals = async () => {
+      const headers: Record<string, string> = {};
+      if (config.apiKey) {
+        headers["X-METHER-KEY"] = config.apiKey;
+      }
+      try {
+        const start = Date.now();
+        const res = await fetch(`${config.backendUrl}/api/v1/vitals`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setCpu(data.cpu);
+          setRam(data.ram);
+          setLatency(Date.now() - start);
+        }
+      } catch (err) {
+        // Backend offline
+      }
+    };
+
+    fetchVitals();
+    const id = setInterval(fetchVitals, 3000);
     return () => clearInterval(id);
   }, []);
 
@@ -162,7 +192,7 @@ function SystemVitals() {
         <MetricRow label="RAM" value={`${ram}%`} bar={ram} />
         <MetricRow label="LATENCY" value={`${latency}ms`} />
         <MetricRow label="UPTIME" value={uptime} />
-        <MetricRow label="MODEL" value="GLM-4.7" />
+        <MetricRow label="MODEL" value={activeModel} />
         <MetricRow label="STATUS" value="NOMINAL" blinkDot />
       </div>
     </div>

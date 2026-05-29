@@ -18,9 +18,9 @@ def test_security_levels():
 
 @pytest.mark.asyncio
 async def test_system_tool():
-    from mether.tools.system import SystemTool
-    tool = SystemTool()
-    result = await tool.execute()
+    from mether.tools.system_control import ProcessTool
+    tool = ProcessTool()
+    result = await tool.execute(action="info")
     assert result.success is True
-    assert "cpu_percent" in result.data
-    assert "ram_percent" in result.data
+    assert "cpu" in result.data
+    assert "ram" in result.data

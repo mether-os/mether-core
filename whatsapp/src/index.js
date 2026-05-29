@@ -19,7 +19,7 @@ const client = new Client({
   }
 })
 
-const mether = new METHERClient(process.env.METHER_BACKEND_URL || 'http://localhost:8000')
+const mether = new METHERClient(process.env.METHER_BACKEND_URL || 'http://localhost:8000', process.env.METHER_API_KEY)
 
 // Keep client warmed up
 setInterval(async () => {

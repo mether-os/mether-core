@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { useMetherStore } from "@/stores/metherStore";
+import { useResearchStore } from "@/stores/researchStore";
 import type { ConnectionStatus } from "@/stores/metherStore";
 import config from "../config";
 
@@ -37,7 +38,6 @@ export function useWebSocket(): WebSocketHook {
     setLastVoiceHeard,
     setVoiceLatency,
     setWakeWordTime,
-    wakeWordTime,
   } = useMetherStore();
 
   const isConnected = connectionStatus === "connected";
@@ -66,8 +66,11 @@ export function useWebSocket(): WebSocketHook {
             if (msg.state === "listening") {
               setWakeWordTime(Date.now());
               setVoiceLatency(null);
-            } else if (msg.state === "speaking" && wakeWordTime) {
-              setVoiceLatency(Date.now() - wakeWordTime);
+            } else if (msg.state === "speaking") {
+              const currentWakeWordTime = useMetherStore.getState().wakeWordTime;
+              if (currentWakeWordTime) {
+                setVoiceLatency(Date.now() - currentWakeWordTime);
+              }
             }
           }
           break;
@@ -85,6 +88,12 @@ export function useWebSocket(): WebSocketHook {
         case "response":
           if (typeof msg.text === "string") {
             setActiveResponse(msg.source === "voice" ? `[VOICE] ${msg.text}` : msg.text);
+            if (msg.source === "voice") {
+              const currentWakeWordTime = useMetherStore.getState().wakeWordTime;
+              if (currentWakeWordTime) {
+                setVoiceLatency(Date.now() - currentWakeWordTime);
+              }
+            }
           }
           break;
         case "voice_status":
@@ -196,6 +205,51 @@ export function useWebSocket(): WebSocketHook {
           useMetherStore.getState().setTerminalProcessExit(payload.returncode);
           break;
         }
+        case "whatsapp_status":
+          if (typeof msg.status === "string" && (msg.status === "connected" || msg.status === "disconnected")) {
+            useMetherStore.getState().setWhatsappStatus(msg.status);
+            if (msg.status === "connected") {
+              useMetherStore.getState().setWhatsappQR(null);
+            }
+          }
+          break;
+        case "whatsapp_qr":
+          if (typeof msg.qr === "string" || msg.qr === null) {
+            useMetherStore.getState().setWhatsappQR(msg.qr);
+          }
+          break;
+        case "research_progress": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const payload = msg as any;
+          if (payload.task_id) {
+            const store = useResearchStore.getState();
+            store.setActiveTaskId(payload.task_id);
+            store.setProgressMessage(payload.message || "");
+            
+            store.setTaskState({
+              id: payload.task_id,
+              topic: payload.topic || store.taskState?.topic || "Research Task",
+              status: payload.status || "running",
+              stage: payload.stage || "collecting",
+              depth: payload.depth || "deep",
+              length_target: payload.length_target || "20_pages",
+              progress_percent: payload.progress || 0.0,
+              estimated_completion_time: payload.eta || null,
+              output_path: payload.output_path || null,
+              error_message: payload.error_message || null,
+            });
+            
+            if (payload.details && payload.details.outline) {
+              store.setSections(payload.details.outline);
+            }
+            if (payload.details && payload.details.sections) {
+              store.setSections(payload.details.sections);
+            }
+            
+            addLog("AGENT", `[RESEARCH] ${payload.message}`);
+          }
+          break;
+        }
         default:
           addLog("WS", `Unknown message type: ${msg.type}`);
       }
@@ -263,17 +317,29 @@ export function useWebSocket(): WebSocketHook {
     connect();
 
     return () => {
+      // Mark as unmounted FIRST so no callbacks fire after this point
       mountedRef.current = false;
-      if (retryTimer.current) clearTimeout(retryTimer.current);
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.close(1000);
+      if (retryTimer.current) {
+        clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+      }
+      const ws = wsRef.current;
+      if (ws) {
+        // Null out all handlers before closing to prevent onclose re-triggering reconnects
+        ws.onopen = null;
+        ws.onclose = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
+          ws.close(1000);
+        }
+        wsRef.current = null;
       }
     };
   }, [
     addLog, setOrbState, setActiveTool, incrementStat, setActiveResponse,
     addSummary, addPing, removePing, setLastVoiceHeard, setVoiceLatency,
-    setVoiceStatus, setWakeWordTime, wakeWordTime, setConnectionStatus
+    setVoiceStatus, setWakeWordTime, setConnectionStatus
   ]);
 
   // Expose send to global store so other components don't have to duplicate connection

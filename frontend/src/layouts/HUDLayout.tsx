@@ -4,6 +4,8 @@ import { useUptime } from "@/hooks/useUptime";
 import { useMetherStore } from "@/stores/metherStore";
 import { WhatsAppPing } from "@/components/WhatsAppPing/WhatsAppPing";
 import { ConfirmDialog } from "@/components/ConfirmDialog/ConfirmDialog";
+import { WhatsAppQRModal } from "@/components/WhatsAppQRModal/WhatsAppQRModal";
+import { ResearchDashboardModal } from "@/components/ResearchPipeline/ResearchDashboardModal";
 import { TerminalFeed } from "@/components/TerminalFeed/TerminalFeed";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -346,6 +348,8 @@ export default function HUDLayout({
 
       <WhatsAppPing />
       <ConfirmDialog />
+      <WhatsAppQRModal />
+      <ResearchDashboardModal />
       <TerminalFeed />
     </div>
   );

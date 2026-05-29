@@ -1,4 +1,5 @@
 import base64
+import asyncio
 from email.mime.text import MIMEText
 from mether.tools.base import BaseTool, ToolResult, SecurityLevel
 from .base_google import BaseGoogleTool
@@ -31,28 +32,39 @@ Gmail tool. Actions:
             "required": ["action"]
         }
 
-    async def execute(self, action: str, **kwargs) -> ToolResult:
+    async def execute(self, action: str, **kwargs) -> ToolResult:  # type: ignore[override]
         service = self._service("gmail", "v1")
         
         try:
             if action == "list_unread":
-                results = service.users().messages().list(
-                    userId="me",
-                    q="is:unread",
-                    maxResults=10
-                ).execute()
+                results = await asyncio.to_thread(
+                    service.users().messages().list(
+                        userId="me",
+                        q="is:unread",
+                        maxResults=10
+                    ).execute
+                )
                 
                 messages = results.get("messages", [])
-                detailed = []
-                for msg in messages[:10]:
-                    m = service.users().messages().get(
-                        userId="me", id=msg["id"],
+                
+                def get_msg_metadata(msg_id):
+                    return service.users().messages().get(
+                        userId="me", id=msg_id,
                         format="metadata",
                         metadataHeaders=["From", "Subject", "Date"]
                     ).execute()
+                
+                msg_list = messages[:10]
+                detailed_raw = await asyncio.gather(*(
+                    asyncio.to_thread(get_msg_metadata, msg["id"])
+                    for msg in msg_list
+                ))
+                
+                detailed = []
+                for msg_info, m in zip(msg_list, detailed_raw):
                     headers = {h["name"]: h["value"] for h in m["payload"]["headers"]}
                     detailed.append({
-                        "id": msg["id"],
+                        "id": msg_info["id"],
                         "from": headers.get("From", ""),
                         "subject": headers.get("Subject", ""),
                         "date": headers.get("Date", ""),
@@ -63,21 +75,31 @@ Gmail tool. Actions:
             elif action == "search":
                 query = kwargs.get("query", "")
                 max_results = kwargs.get("max_results", 10)
-                results = service.users().messages().list(
-                    userId="me", q=query, maxResults=max_results
-                ).execute()
+                results = await asyncio.to_thread(
+                    service.users().messages().list(
+                        userId="me", q=query, maxResults=max_results
+                    ).execute
+                )
                 messages = results.get("messages", [])
                 
-                detailed = []
-                for msg in messages:
-                    m = service.users().messages().get(
-                        userId="me", id=msg["id"],
+                def get_msg_metadata(msg_id):
+                    return service.users().messages().get(
+                        userId="me", id=msg_id,
                         format="metadata",
                         metadataHeaders=["From", "Subject", "Date"]
                     ).execute()
+                
+                msg_list = messages[:max_results]
+                detailed_raw = await asyncio.gather(*(
+                    asyncio.to_thread(get_msg_metadata, msg["id"])
+                    for msg in msg_list
+                ))
+                
+                detailed = []
+                for msg_info, m in zip(msg_list, detailed_raw):
                     headers = {h["name"]: h["value"] for h in m["payload"]["headers"]}
                     detailed.append({
-                        "id": msg["id"],
+                        "id": msg_info["id"],
                         "from": headers.get("From", ""),
                         "subject": headers.get("Subject", ""),
                         "date": headers.get("Date", ""),
@@ -98,8 +120,9 @@ Gmail tool. Actions:
                         return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
                     if "parts" in payload:
                         for part in payload["parts"]:
-                            if part["mimeType"] == "text/plain":
-                                return get_body(part)
+                            body = get_body(part)
+                            if body:
+                                return body
                     return ""
                 
                 body = get_body(msg["payload"])

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useMetherStore } from "@/stores/metherStore";
+import { useResearchStore } from "@/stores/researchStore";
 import config from "../../config";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -66,6 +67,7 @@ function SegmentedBar({ value, max = 100 }: { value: number; max?: number }) {
 
 interface Blip {
   id: number;
+  label: string;
   angle: number; // degrees
   radius: number; // 0–1 normalized
   speed: number; // deg/s drift
@@ -76,19 +78,35 @@ function ProximityRadar() {
   const animRef = useRef<number>(0);
   const lastTime = useRef<number>(0);
 
+  const isConnected = useMetherStore((s) => s.isConnected);
+  const whatsappStatus = useMetherStore((s) => s.whatsappStatus);
+  const voiceStatus = useMetherStore((s) => s.voiceStatus);
+  const googleAuthStatus = useMetherStore((s) => s.googleAuthStatus);
+
   /* ── Generate blips once ── */
   const blips = useMemo<Blip[]>(() => {
     return [
-      { id: 0, angle: 45, radius: 0.4, speed: 0.5 },
-      { id: 1, angle: 120, radius: 0.7, speed: 0.8 },
-      { id: 2, angle: 210, radius: 0.3, speed: 0.4 },
-      { id: 3, angle: 300, radius: 0.8, speed: 1.1 },
-      { id: 4, angle: 15, radius: 0.6, speed: 0.6 }
+      { id: 0, label: "SYS", angle: 45, radius: 0.4, speed: 0.5 },
+      { id: 1, label: "WA", angle: 120, radius: 0.7, speed: 0.8 },
+      { id: 2, label: "VOIC", angle: 210, radius: 0.3, speed: 0.4 },
+      { id: 3, label: "GGL", angle: 300, radius: 0.8, speed: 1.1 },
+      { id: 4, label: "LLM", angle: 15, radius: 0.6, speed: 0.6 }
     ];
   }, []);
 
   /* ── Blip drift state ── */
   const [blipAngles, setBlipAngles] = useState(() => blips.map((b) => b.angle));
+
+  const getIsActive = (id: number) => {
+    switch (id) {
+      case 0: return isConnected;
+      case 1: return whatsappStatus === "connected";
+      case 2: return voiceStatus === "online";
+      case 3: return googleAuthStatus;
+      case 4: return isConnected;
+      default: return false;
+    }
+  };
 
   /* ── Animation loop ── */
   useEffect(() => {
@@ -242,14 +260,26 @@ function ProximityRadar() {
               ((sweepAngle - blipAngles[i] + 540) % 360) - 180
             );
             const brightness = angleDiff < 30 ? 1 : Math.max(0.15, 1 - angleDiff / 180);
+            const isActive = getIsActive(blip.id);
 
             return (
-              <polygon
-                key={blip.id}
-                points={`${bx},${by - 4} ${bx + 4},${by} ${bx},${by + 4} ${bx - 4},${by}`}
-                fill={`rgba(76, 215, 246, ${brightness})`}
-                filter={brightness > 0.5 ? "url(#blipGlow)" : undefined}
-              />
+              <g key={blip.id}>
+                <polygon
+                  points={`${bx},${by - 4} ${bx + 4},${by} ${bx},${by + 4} ${bx - 4},${by}`}
+                  fill={isActive ? `rgba(76, 215, 246, ${brightness})` : `rgba(239, 68, 68, ${brightness * 0.45})`}
+                  filter={isActive && brightness > 0.5 ? "url(#blipGlow)" : undefined}
+                />
+                <text
+                  x={bx + 6}
+                  y={by + 2}
+                  fill={isActive ? `rgba(76, 215, 246, ${brightness * 0.8})` : `rgba(239, 68, 68, ${brightness * 0.5})`}
+                  fontSize="6"
+                  fontFamily="JetBrains Mono, monospace"
+                  className="font-bold tracking-wider"
+                >
+                  {blip.label}
+                </text>
+              </g>
             );
           })}
         </svg>
@@ -268,11 +298,6 @@ interface Objective {
   status: "IN PROGRESS" | "PENDING" | "COMPLETE";
 }
 
-const OBJECTIVES: Objective[] = [
-  { name: "BUILD METHER CORE", progress: 15, status: "IN PROGRESS" },
-  { name: "CONNECT VOICE PIPELINE", progress: 0, status: "PENDING" },
-  { name: "WHATSAPP BRIDGE", progress: 0, status: "PENDING" },
-];
 
 function ObjectiveItem({ obj }: { obj: Objective }) {
   const chipClass =
@@ -306,11 +331,43 @@ function ObjectiveItem({ obj }: { obj: Objective }) {
 }
 
 function ActiveObjectives() {
+  const [objectives, setObjectives] = useState<Objective[]>([]);
+
+  useEffect(() => {
+    const fetchObjectives = async () => {
+      const headers: Record<string, string> = {};
+      if (config.apiKey) {
+        headers["X-METHER-KEY"] = config.apiKey;
+      }
+      try {
+        const res = await fetch(`${config.backendUrl}/api/v1/objectives`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.objectives)) {
+            setObjectives(data.objectives);
+          }
+        }
+      } catch (err) {
+        // Backend offline
+      }
+    };
+
+    fetchObjectives();
+    const id = setInterval(fetchObjectives, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  const displayObjectives = objectives.length > 0 ? objectives : [
+    { name: "BUILD METHER CORE", progress: 85, status: "IN PROGRESS" as const },
+    { name: "CONNECT VOICE PIPELINE", progress: 0, status: "PENDING" as const },
+    { name: "WHATSAPP BRIDGE", progress: 0, status: "PENDING" as const },
+  ];
+
   return (
     <div className="shrink-0">
       <SectionHeader title="OBJECTIVES" />
       <div className="flex flex-col divide-y divide-primary/[0.08]">
-        {OBJECTIVES.map((obj) => (
+        {displayObjectives.map((obj) => (
           <ObjectiveItem key={obj.name} obj={obj} />
         ))}
       </div>
@@ -393,12 +450,18 @@ function GoogleServices() {
   const [status, setStatus] = useState<Record<string, unknown> | null>(null);
 
   const fetchStatus = async () => {
+    const headers: Record<string, string> = {};
+    if (config.apiKey) {
+      headers["X-METHER-KEY"] = config.apiKey;
+    }
     try {
-      const res = await fetch(`${config.backendUrl}/google/status`);
+      const res = await fetch(`${config.backendUrl}/api/v1/google/status`, { headers });
       const data = await res.json();
       setStatus(data);
+      useMetherStore.getState().setGoogleAuthStatus(!!data.authenticated);
     } catch {
       setStatus({ authenticated: false });
+      useMetherStore.getState().setGoogleAuthStatus(false);
     }
   };
 
@@ -410,9 +473,16 @@ function GoogleServices() {
   }, []);
 
   const handleConnect = async () => {
+    const headers: Record<string, string> = {};
+    if (config.apiKey) {
+      headers["X-METHER-KEY"] = config.apiKey;
+    }
     try {
-      await fetch(`${config.backendUrl}/google/auth`);
-      setTimeout(fetchStatus, 3000);
+      const res = await fetch(`${config.backendUrl}/api/v1/google/auth/url`, { headers });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
     } catch (err) {
       console.error(err);
     }
@@ -471,6 +541,99 @@ function GoogleServices() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   SECTION 5 — Research Pipeline
+   ═══════════════════════════════════════════════════════════════ */
+function ResearchPipelineControl() {
+  const setOpen = useResearchStore((s) => s.setOpen);
+  const taskState = useResearchStore((s) => s.taskState);
+
+  return (
+    <div className="shrink-0">
+      <SectionHeader title="RESEARCH PIPELINE" />
+      <div className="flex flex-col gap-2 mt-1">
+        {taskState && (
+          <div 
+            className="flex flex-col gap-1.5 p-2 bg-primary/5 border border-primary/10 rounded-sm relative overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg, rgba(76,215,246,0.02) 0%, rgba(76,215,246,0.06) 100%)",
+            }}
+          >
+            {/* Top row: Topic and % */}
+            <div className="flex items-center justify-between text-[9px]">
+              <span 
+                className="text-outline uppercase truncate max-w-[130px] font-bold"
+                title={taskState.topic}
+              >
+                {taskState.topic}
+              </span>
+              <span className="text-primary font-bold font-mono">
+                {Math.round(taskState.progress_percent)}%
+              </span>
+            </div>
+
+            {/* Progress segment bar */}
+            <div className="flex gap-[2px]">
+              {Array.from({ length: 15 }, (_, i) => {
+                const filled = Math.round((taskState.progress_percent / 100) * 15);
+                const isActive = i < filled;
+                return (
+                  <div
+                    key={i}
+                    className="h-1.5 flex-1 transition-all duration-300"
+                    style={{
+                      background: isActive 
+                        ? "linear-gradient(90deg, #4cd7f6, #06b6d4)" 
+                        : "rgba(148, 163, 184, 0.15)",
+                      boxShadow: isActive && i === filled - 1
+                        ? "0 0 4px rgba(76, 215, 246, 0.6)" 
+                        : "none",
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Bottom details row */}
+            <div className="flex justify-between items-center text-[8px] font-mono text-on-surface-variant/80">
+              <span className="uppercase tracking-wider">
+                Stage: {taskState.stage.replace(/_/g, " ")}
+              </span>
+              <span 
+                className={`uppercase font-bold tracking-widest ${
+                  taskState.status === "running" 
+                    ? "text-success animate-pulse" 
+                    : taskState.status === "failed"
+                      ? "text-error"
+                      : "text-primary"
+                }`}
+              >
+                {taskState.status}
+              </span>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setOpen(true)}
+          className="hud-button w-full relative overflow-hidden group py-2"
+          style={{
+            borderColor: "rgba(76,215,246,0.35)",
+            background: "linear-gradient(135deg, rgba(76,215,246,0.03) 0%, rgba(6,182,212,0.08) 100%)",
+          }}
+        >
+          {/* Subtle moving shine overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none" />
+          
+          <div className="flex items-center justify-center gap-1.5 text-[9px] tracking-widest font-bold font-mono">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" style={{ boxShadow: "0 0 6px var(--color-glow-cyan-intense)" }} />
+            LAUNCH CONTROL ROOM
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    RIGHT PANEL — Main Export
    ═══════════════════════════════════════════════════════════════ */
 const RightPanel = () => {
@@ -506,6 +669,12 @@ const RightPanel = () => {
 
       {/* Section 4 — Google Services */}
       <GoogleServices />
+
+      {/* Divider */}
+      <div className="my-2 h-px bg-primary/15 shrink-0" />
+
+      {/* Section 5 — Research Pipeline */}
+      <ResearchPipelineControl />
     </div>
   );
 }

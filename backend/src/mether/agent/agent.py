@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 import asyncio
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import structlog
 
@@ -14,6 +14,9 @@ from mether.events.bus import EventBus
 from mether.memory.context import ContextMemory
 from mether.tools.registry import ToolRegistry
 from mether.tools.base import SecurityLevel
+
+if TYPE_CHECKING:
+    from mether.memory.persistent_memory import PersistentMemory
 
 logger = structlog.get_logger(__name__)
 
@@ -52,13 +55,20 @@ class METHERAgent:
         tools: ToolRegistry,
         memory: ContextMemory,
         bus: EventBus,
+        persistent_memory: PersistentMemory | None = None,
     ) -> None:
         self.llm = llm
         self.tools = tools
         self.memory = memory
         self.bus = bus
+        self.persistent_memory = persistent_memory
+        self.session_id = str(uuid.uuid4())
         self.pending_confirmations: dict[str, asyncio.Event] = {}
         self.confirmation_results: dict[str, bool] = {}
+
+    async def start(self) -> None:
+        if self.persistent_memory:
+            await self.persistent_memory.start_session(self.session_id)
 
     async def confirm_action(self, action_id: str, approved: bool):
         if action_id in self.pending_confirmations:
@@ -79,8 +89,11 @@ class METHERAgent:
         # 1. Emit thinking event
         await self.bus.emit("agent.thinking", {"message": user_message})
 
+        if self.persistent_memory:
+            await self.persistent_memory.add_observation(self.session_id, "user_message", user_message)
+
         # 2. Build system prompt
-        system_prompt = self._build_system_prompt()
+        system_prompt = await self._build_system_prompt()
 
         # 3. Build messages list from memory + current message
         messages: list[dict[str, Any]] = self.memory.get_recent_context()
@@ -98,6 +111,9 @@ class METHERAgent:
 
         # 6. Persist to session memory
         self.memory.add_interaction(user_message, response_text)
+        if self.persistent_memory:
+            await self.persistent_memory.add_observation(self.session_id, "agent_response", response_text)
+            asyncio.create_task(self.persistent_memory.summarize_interaction(self.session_id))
 
         # 7. Emit response event
         await self.bus.emit("agent.response", {"text": response_text})
@@ -120,6 +136,7 @@ class METHERAgent:
         Returns the final assistant text when ``stop_reason`` is ``"end_turn"``
         or the maximum number of tool rounds is reached.
         """
+        text_parts: list[str] = []
         for round_idx in range(_MAX_TOOL_ROUNDS):
             llm_response = await self.llm.chat(messages=messages, tools=tools, system=system)
 
@@ -127,7 +144,6 @@ class METHERAgent:
             content_blocks = llm_response.get("content", [])
 
             # Accumulate any text blocks
-            text_parts: list[str] = []
             tool_use_blocks: list[dict[str, Any]] = []
 
             for block in content_blocks:
@@ -153,16 +169,29 @@ class METHERAgent:
                 logger.info("agent.tool_call", tool=tool_name, round=round_idx)
                 await self.bus.emit("tool.start", {"tool": tool_name, "input": tool_input})
 
+                if self.persistent_memory:
+                    await self.persistent_memory.add_observation(
+                        self.session_id,
+                        "tool_call",
+                        json.dumps({"name": tool_name, "input": tool_input})
+                    )
+
                 tool_impl = self.tools.get(tool_name)
                 if tool_impl is None:
                     result_content = json.dumps({"error": f"Unknown tool: {tool_name}"})
                 else:
                     try:
-                        if getattr(tool_impl, "security_level", None) == SecurityLevel.DANGEROUS:
+                        sec_level = getattr(tool_impl, "security_level", None)
+                        if hasattr(tool_impl, "get_security_level"):
+                            sec_level = tool_impl.get_security_level(**tool_input)
+
+                        if sec_level == SecurityLevel.DANGEROUS:
                             action_id = str(uuid.uuid4())
                             desc = f"Execute dangerous action with tool '{tool_name}'"
                             if tool_name == "process" and tool_input.get("action") == "kill":
                                 desc = f"Kill process '{tool_input.get('name') or tool_input.get('pid')}'"
+                            elif tool_name == "filesystem" and tool_input.get("action") == "write":
+                                desc = f"Write/overwrite file '{tool_input.get('path')}'"
                             
                             await self.bus.emit("ws.send", {
                                 "type": "confirm_required",
@@ -199,6 +228,13 @@ class METHERAgent:
 
                 await self.bus.emit("tool.done", {"tool": tool_name, "result": result_content})
 
+                if self.persistent_memory:
+                    await self.persistent_memory.add_observation(
+                        self.session_id,
+                        "tool_result",
+                        json.dumps({"name": tool_name, "result": result_content})
+                    )
+
                 tool_results.append(
                     {
                         "type": "tool_result",
@@ -212,15 +248,23 @@ class METHERAgent:
 
         # Exhausted tool rounds — return whatever text we have.
         logger.warning("agent.max_tool_rounds", max=_MAX_TOOL_ROUNDS)
-        return "\n".join(text_parts) if text_parts else _FALLBACK_RESPONSE  # type: ignore[possibly-undefined]
+        return "\n".join(text_parts) if text_parts else _FALLBACK_RESPONSE
 
-    def _build_system_prompt(self) -> str:
+    async def _build_system_prompt(self) -> str:
         """Construct the full system prompt.
 
         Combines the CLAUDE.md persona with a dynamic listing of
-        available tools.
+        available tools and relevant past memories.
         """
         persona = self.memory.load_claude_md()
+
+        # Inject recent memory context if database is active
+        memory_section = ""
+        if self.persistent_memory:
+            recent_summaries = await self.persistent_memory.get_recent_summaries(limit=5)
+            if recent_summaries:
+                lines = [f"- {s['summary']}" for s in recent_summaries]
+                memory_section = "\n\n## Recent Memories / Context\n" + "\n".join(lines)
 
         tool_names = self.tools.list_names()
         if tool_names:
@@ -271,4 +315,4 @@ TIME ZONE: All times are in IST (Asia/Kolkata, UTC+5:30).
 When creating calendar events, always convert user's local time to ISO format.
 """
 
-        return persona + tools_section + "\n\nFor WhatsApp: when user asks to send a message to a name (e.g. 'send mohit a message'), do NOT use the resolve tool. Simply call the 'send' action with 'to' set to the person's name directly. The backend will instantly auto-resolve it. Only call 'send' once.\n" + system_tools_prompt
+        return persona + memory_section + tools_section + "\n\nFor WhatsApp: when user asks to send a message to a name (e.g. 'send mohit a message'), do NOT use the resolve tool. Simply call the 'send' action with 'to' set to the person's name directly. The backend will instantly auto-resolve it. Only call 'send' once.\n" + system_tools_prompt

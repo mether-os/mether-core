@@ -10,9 +10,10 @@ import websockets
 class METHERClient:
     """Connects to the METHER OS backend (port 8000) over WebSocket + HTTP."""
 
-    def __init__(self, base_url: str, ws_url: str):
+    def __init__(self, base_url: str, ws_url: str, api_key: str | None = None):
         self.base_url = base_url
         self.ws_url = ws_url
+        self.api_key = api_key
         self.ws = None
         self.msg_queue = asyncio.Queue()
         self.listen_task = None
@@ -20,8 +21,16 @@ class METHERClient:
 
     async def connect_ws(self):
         """Open a persistent WebSocket to the METHER voice endpoint."""
+        url = self.ws_url
+        if self.api_key:
+            from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+            u = urlparse(url)
+            q = dict(parse_qsl(u.query))
+            q['token'] = self.api_key
+            u = u._replace(query=urlencode(q))
+            url = urlunparse(u)
         self.ws = await websockets.connect(
-            self.ws_url,
+            url,
             ping_interval=20,
             ping_timeout=10,
         )
@@ -53,10 +62,14 @@ class METHERClient:
     async def notify(self, event: str, data: dict):
         """Fire-and-forget event notification to the backend."""
         try:
+            headers = {}
+            if self.api_key:
+                headers["X-METHER-KEY"] = self.api_key
             async with httpx.AsyncClient() as client:
                 await client.post(
                     f"{self.base_url}/voice/event",
                     json={"event": event, "data": data},
+                    headers=headers,
                     timeout=3,
                 )
         except Exception:

@@ -11,7 +11,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from mether.agent.agent import METHERAgent
 from mether.events.bus import EventBus
-from mether.tools.whatsapp import HANDLED_CONTACTS
+from mether.tools.whatsapp import HANDLED_CONTACTS, HANDLED_CONTACTS_LOCK
 
 logger = structlog.get_logger(__name__)
 
@@ -154,25 +154,26 @@ async def websocket_endpoint(
                 intro_msg = "Hey! Mayank's not available rn, I'm his AI assistant. I'll pass the message along, but is there anything I can help with?"
                 
                 try:
+                    history = []
                     async with httpx.AsyncClient() as client:
-                        # Add to handled contacts
-                        HANDLED_CONTACTS[contact_id] = {
-                            "name": contact_name,
-                            "start_time": time.time(),
-                            "last_activity": time.time(),
-                            "messages": []
-                        }
-                        
                         resp = await client.get(f"http://localhost:3001/messages/{contact_id}")
                         if resp.status_code == 200:
                             msgs = resp.json().get("messages", [])
                             # Limit to last 3 msgs for context
                             for m in msgs[-3:]:
                                 role = "assistant" if m.get("fromMe") else "user"
-                                HANDLED_CONTACTS[contact_id]["messages"].append({"role": role, "content": m.get("body", "")})
+                                history.append({"role": role, "content": m.get("body", "")})
                         
-                        # Send the introductory reply
-                        HANDLED_CONTACTS[contact_id]["messages"].append({"role": "assistant", "content": intro_msg})
+                        history.append({"role": "assistant", "content": intro_msg})
+                        
+                        async with HANDLED_CONTACTS_LOCK:
+                            HANDLED_CONTACTS[contact_id] = {
+                                "name": contact_name,
+                                "start_time": time.time(),
+                                "last_activity": time.time(),
+                                "messages": history
+                            }
+                        
                         await client.post("http://localhost:3001/send", json={"to": contact_id, "message": intro_msg})
                 except Exception as e:
                     logger.error(f"Failed to start auto-handle: {e}")
@@ -211,6 +212,7 @@ async def websocket_endpoint(
         await bus.unsubscribe("agent.thinking", _forward_thinking)
         await bus.unsubscribe("tool.start", _forward_tool_start)
         await bus.unsubscribe("tool.done", _forward_tool_done)
+        await bus.unsubscribe("whatsapp.message", _forward_whatsapp)
         app.state.ws_client_count = max(0, getattr(app.state, "ws_client_count", 1) - 1)
 
 

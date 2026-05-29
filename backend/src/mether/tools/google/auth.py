@@ -22,7 +22,7 @@ class GoogleAuth:
         Returns valid credentials.
         - Loads from token file if exists
         - Refreshes if expired
-        - Runs OAuth flow if no token (opens browser)
+        - Raises error if no token (forces OAuth redirect flow)
         """
         creds = None
         
@@ -35,22 +35,43 @@ class GoogleAuth:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                if not self.credentials_path.exists():
-                    raise FileNotFoundError(
-                        f"Google credentials not found at {self.credentials_path}\n"
-                        "Download from Google Cloud Console → APIs & Services → Credentials"
-                    )
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    str(self.credentials_path), SCOPES
+                raise FileNotFoundError(
+                    "Google authentication token missing or invalid. Please connect via Google Services in the dashboard."
                 )
-                # Opens browser for OAuth consent
-                creds = flow.run_local_server(port=0)
             
-            # Save token for next time
+            # Save refreshed token
             self.token_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.token_path, "w") as f:
                 f.write(creds.to_json())
         
+        self._creds = creds
+        return creds
+
+    def get_authorization_url(self, redirect_uri: str) -> str:
+        """Get the Google OAuth consent screen authorization URL."""
+        if not self.credentials_path.exists():
+            raise FileNotFoundError(
+                f"Google credentials not found at {self.credentials_path}\n"
+                "Download from Google Cloud Console → APIs & Services → Credentials"
+            )
+        flow = InstalledAppFlow.from_client_secrets_file(
+            str(self.credentials_path), SCOPES,
+            redirect_uri=redirect_uri
+        )
+        auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
+        return auth_url
+
+    def fetch_token_from_code(self, code: str, redirect_uri: str) -> Credentials:
+        """Exchange auth code for credentials, save to token path, and return them."""
+        flow = InstalledAppFlow.from_client_secrets_file(
+            str(self.credentials_path), SCOPES,
+            redirect_uri=redirect_uri
+        )
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+        self.token_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.token_path, "w") as f:
+            f.write(creds.to_json())
         self._creds = creds
         return creds
     

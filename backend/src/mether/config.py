@@ -37,9 +37,11 @@ class Settings(BaseSettings):
     # --- Server -------------------------------------------------------------
     mether_host: str = "0.0.0.0"
     mether_port: int = 8000
+    mether_api_key: str | None = None
 
     # --- Memory / Context ---------------------------------------------------
     claude_md_path: str = "~/.mether/CLAUDE.md"
+    memory_db_path: str = "~/.mether/memory.db"
 
     # --- Logging ------------------------------------------------------------
     log_level: str = "INFO"
@@ -55,6 +57,11 @@ class Settings(BaseSettings):
     def claude_md_resolved(self) -> Path:
         """Return an absolute ``Path`` for the CLAUDE.md file."""
         return Path(self.claude_md_path).expanduser().resolve()
+
+    @property
+    def memory_db_resolved(self) -> Path:
+        """Return an absolute ``Path`` for the memory.db file."""
+        return Path(self.memory_db_path).expanduser().resolve()
 
 
 def get_settings() -> Settings:

@@ -31,7 +31,7 @@ Google Drive tool. Actions:
             "required": ["action"]
         }
 
-    async def execute(self, action: str, **kwargs) -> ToolResult:
+    async def execute(self, action: str, **kwargs) -> ToolResult:  # type: ignore[override]
         service = self._service("drive", "v3")
         
         try:
@@ -50,7 +50,8 @@ Google Drive tool. Actions:
                 query = kwargs["query"]
                 max_results = kwargs.get("max_results", 10)
                 
-                drive_query = f"name contains '{query}' or fullText contains '{query}'"
+                query_escaped = query.replace("'", "\\'")
+                drive_query = f"name contains '{query_escaped}' or fullText contains '{query_escaped}'"
                 
                 results = service.files().list(
                     q=drive_query,

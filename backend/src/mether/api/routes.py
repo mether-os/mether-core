@@ -3,33 +3,88 @@
 from __future__ import annotations
 
 from typing import Any
+from pydantic import BaseModel
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Header, HTTPException, Depends
 import httpx
 import asyncio
 import structlog
 import time
 from mether.tools.whatsapp import HANDLED_CONTACTS
-from mether.utils.whatsapp_formatter import format_for_whatsapp
+from mether.config import get_settings
 
-router = APIRouter(tags=["mether"], prefix="/api/v1")
+async def verify_api_key(x_mether_key: str | None = Header(None, alias="X-METHER-KEY")) -> None:
+    settings = get_settings()
+    if settings.mether_api_key and x_mether_key != settings.mether_api_key:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid or missing API key")
+
+router = APIRouter(tags=["mether"], prefix="/api/v1", dependencies=[Depends(verify_api_key)])
 root_router = APIRouter(tags=["health"])
+
+
+def _enforce_alternating_roles(messages: list[dict]) -> list[dict]:
+    """Ensure messages follow the strict user/assistant alternating pattern.
+
+    1. Merge consecutive messages from the same role by joining content.
+    2. Drop leading assistant messages so the list always starts with 'user'.
+    """
+    if not messages:
+        return messages
+
+    # Step 1: merge consecutive same-role messages
+    merged: list[dict] = []
+    for msg in messages:
+        if merged and merged[-1]["role"] == msg["role"]:
+            # Append content with a newline separator
+            merged[-1]["content"] = merged[-1]["content"] + "\n" + msg["content"]
+        else:
+            merged.append({"role": msg["role"], "content": msg["content"]})
+
+    # Step 2: drop leading assistant messages
+    while merged and merged[0]["role"] != "user":
+        merged.pop(0)
+
+    return merged
 
 
 async def load_google_from_env():
     """Load Google credentials from env vars on Render."""
     import os
     from pathlib import Path
+    from mether.config import get_settings
+    settings = get_settings()
+    
     creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
     token_json = os.getenv("GOOGLE_TOKEN_JSON")
     claude_md = os.getenv("CLAUDE_MD_CONTENT")
     
+    to_write = []
     if creds_json:
-        Path("/tmp/google_credentials.json").write_text(creds_json)
+        to_write.append((Path(settings.google_credentials_path).expanduser().resolve(), creds_json))
     if token_json:
-        Path("/tmp/google_token.json").write_text(token_json)
+        to_write.append((Path(settings.google_token_path).expanduser().resolve(), token_json))
     if claude_md:
-        Path("/tmp/CLAUDE.md").write_text(claude_md)
+        to_write.append((Path(settings.claude_md_path).expanduser().resolve(), claude_md))
+        
+    for path, content in to_write:
+        parent = path.parent
+        if not parent.exists():
+            parent.mkdir(parents=True, exist_ok=True)
+            try:
+                parent.chmod(0o700)
+            except Exception:
+                pass
+        
+        if path.exists():
+            try:
+                path.unlink()
+            except Exception:
+                pass
+        path.write_text(content, encoding="utf-8")
+        try:
+            path.chmod(0o600)
+        except Exception:
+            pass
 
 @root_router.get("/health")
 @router.get("/health")
@@ -55,10 +110,14 @@ async def status(request: Request) -> dict[str, Any]:
     """Readiness / status check with runtime details."""
     tools: list[str] = request.app.state.tools.list_names()
     ws_clients: int = getattr(request.app.state, "ws_client_count", 0)
+    # Expose the active model name so the frontend HUD can display it dynamically
+    config = request.app.state.config
+    model_name: str = getattr(config, "llm_model", "claude-sonnet-4-5")
     return {
         "agent": "ready",
         "tools": tools,
         "ws_clients": ws_clients,
+        "model": model_name,
     }
 
 
@@ -79,112 +138,23 @@ async def whatsapp_event(request: Request):
     data = body.get("data", {})
     
     if event == "whatsapp.message":
-        contact_id = data.get("from")
-        contact_num = data.get("contactNumber")
-        logger.info(f"Incoming WA msg from: {contact_id} / Num: {contact_num} / {data.get('fromName')}")
-        logger.info(f"Current HANDLED_CONTACTS: {list(HANDLED_CONTACTS.keys())}")
-        
-        matched_id = None
-        if contact_id in HANDLED_CONTACTS:
-            matched_id = contact_id
-        elif contact_num:
-            for hid in HANDLED_CONTACTS:
-                if hid.startswith(str(contact_num) + "@"):
-                    matched_id = hid
-                    break
-                    
-        # Ultimate fallback: match by name
-        if not matched_id and data.get("fromName"):
-            for hid, hc in HANDLED_CONTACTS.items():
-                if hc.get("name") == data.get("fromName"):
-                    matched_id = hid
-                    break
-        
-        if matched_id:
-            logger.info(f"[WA-AUTO] Auto-handling message from {data.get('fromName')}")
-            hc = HANDLED_CONTACTS[matched_id]
-            hc["last_activity"] = time.time()
-            hc["messages"].append({"role": "user", "content": data.get("body", "")})
-            
-            system_prompt = """You are texting on WhatsApp on behalf of Mayank Sharma (22, CS student, India).
-Mayank is busy rn. You're replying as him — not as an AI, not as an assistant.
-
-CRITICAL RULES — follow these EXACTLY:
-- Write like a 22-year-old Indian CS student would text on WhatsApp
-- Use Hinglish naturally (bhai, yaar, chill, haan, nahi, kya, etc.)
-- Short sentences. Keep it brief. No essays.
-- NEVER use bullet points or numbered lists
-- NEVER start with 'Sure' or 'Certainly' or 'Great question' or 'Absolutely'
-- NEVER say 'As an AI' or 'I'm an AI assistant' or similar
-- If first message: briefly mention Mayank's busy, you're helping out
-- For code questions: paste code plainly, say 'yeh try karo' or 'try this'
-- For casual chat: just vibe naturally, use 'lol' 'haha' 'ok' 'acha' where natural
-- If you can't help: say Mayank will reply later, don't over-apologize
-- Match the energy of the person you're talking to
-- Typos are fine occasionally (but never in code)
-- NO markdown. NO bold. NO italics. NO headers. Just plain text."""
-
-            llm = request.app.state.llm
-            ctx_msgs = hc["messages"][-5:]
-            try:
-                llm_response = await llm.chat(messages=ctx_msgs, system=system_prompt)
-                content = llm_response.get("content", [])
-                llm_reply_raw = content[0].get("text", "") if content else "..."
-            except Exception as e:
-                logger.error(f"Auto-reply LLM error: {e}")
-                llm_reply_raw = "Hey, Mayank's busy rn — he'll get back to you soon!"
-
-            # Post-process through the formatter to strip any remaining AI-isms
-            formatted = format_for_whatsapp(llm_reply_raw)
-            
-            # Send as single or multi-message
-            async with httpx.AsyncClient() as client:
-                if isinstance(formatted, list):
-                    for i, msg_part in enumerate(formatted):
-                        if i > 0:
-                            await asyncio.sleep(1.5)
-                        await client.post("http://localhost:3001/send", json={"to": matched_id, "message": msg_part})
-                    llm_reply = "\n".join(formatted)
-                else:
-                    await client.post("http://localhost:3001/send", json={"to": matched_id, "message": formatted})
-                    llm_reply = formatted
-
-            hc["messages"].append({"role": "assistant", "content": llm_reply})
-            
-            await bus.emit("ws.send", {
-                "type": "whatsapp_auto_reply", 
-                "to": data.get("fromName"), 
-                "message": llm_reply, 
-                "original": data.get("body")
-            })
-        else:
-            # Emit wa_ping for unhandled messages
-            import uuid
-            ping_id = str(uuid.uuid4())
-            await bus.emit("ws.send", {
-                "type": "wa_ping",
-                "contact_id": contact_id,
-                "contact_name": data.get("fromName") or contact_id,
-                "preview": data.get("body", "")[:60],
-                "timestamp": data.get("timestamp", int(time.time())),
-                "ping_id": ping_id
-            })
-
-        # Forward message to the frontend and log
-        await bus.emit("whatsapp.message", data)
-        await bus.emit("ws.send", {"type": "log", "module": "WA", "message": f"Message from {data.get('fromName')}: {data.get('body', '')[:50]}"})
+        from mether.services.whatsapp_handler import handle_incoming_whatsapp_message
+        asyncio.create_task(handle_incoming_whatsapp_message(data, request.app.state.llm, bus))
     
     elif event == "whatsapp.ready":
         logger.info("whatsapp.ready", status="connected")
+        await bus.emit("ws.send", {"type": "whatsapp_status", "status": "connected"})
         await bus.emit("ws.send", {"type": "log", "module": "WA", "message": "WhatsApp connected"})
         
     elif event == "whatsapp.qr":
-        # Can be emitted to frontend to display the QR code
-        await bus.emit("whatsapp.qr", data)
+        qr_data = data.get("qr")
+        await bus.emit("ws.send", {"type": "whatsapp_qr", "qr": qr_data})
+        await bus.emit("ws.send", {"type": "whatsapp_status", "status": "disconnected"})
         await bus.emit("ws.send", {"type": "log", "module": "WA", "message": "New QR code generated"})
         
     elif event == "whatsapp.disconnected":
         logger.warning("whatsapp.disconnected", reason=data.get("reason"))
+        await bus.emit("ws.send", {"type": "whatsapp_status", "status": "disconnected"})
         await bus.emit("ws.send", {"type": "log", "module": "WA", "message": f"Disconnected: {data.get('reason')}"})
 
     return {"success": True}
@@ -243,9 +213,7 @@ async def voice_event(request: Request):
 
 @router.get("/google/status")
 async def google_status(request: Request) -> dict[str, Any]:
-    from mether.tools.google.auth import GoogleAuth
-    config = request.app.state.config
-    auth = GoogleAuth(config.google_credentials_path, config.google_token_path)
+    auth = request.app.state.google_auth
     if not auth.is_authenticated():
         return {"authenticated": False}
     
@@ -264,25 +232,245 @@ async def google_status(request: Request) -> dict[str, Any]:
         "token_expires": str(getattr(auth.get_credentials(), "expiry", None))
     }
 
-@router.get("/google/auth")
-async def google_auth_endpoint(request: Request) -> dict[str, Any]:
-    from mether.tools.google.auth import GoogleAuth
-    config = request.app.state.config
-    auth = GoogleAuth(config.google_credentials_path, config.google_token_path)
-    if auth.is_authenticated():
-        return {"authenticated": True, "message": "Already logged in"}
+@router.get("/google/auth/url")
+async def google_auth_url(request: Request) -> dict[str, Any]:
+    auth = request.app.state.google_auth
+    if not auth.credentials_path.exists():
+        return {"error": "Google client credentials file missing on backend"}
     
+    redirect_uri = str(request.url_for("google_auth_callback"))
     try:
-        auth.get_credentials()
-        return {"authenticated": True, "email": "Connected"}
+        url = auth.get_authorization_url(redirect_uri)
+        return {"url": url}
     except Exception as e:
-        return {"authenticated": False, "error": str(e)}
+        return {"error": str(e)}
+
+@root_router.get("/api/v1/google/auth/callback", name="google_auth_callback")
+async def google_auth_callback(request: Request, code: str) -> Any:
+    from fastapi.responses import RedirectResponse
+    auth = request.app.state.google_auth
+    redirect_uri = str(request.url_for("google_auth_callback"))
+    try:
+        await asyncio.to_thread(auth.fetch_token_from_code, code, redirect_uri)
+        config = request.app.state.config
+        return RedirectResponse(url=config.frontend_url)
+    except Exception as e:
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=f"<h3>Authentication Failed</h3><p>{e}</p>", status_code=400)
 
 @router.get("/google/logout")
 async def google_logout(request: Request) -> dict[str, Any]:
-    from mether.tools.google.auth import GoogleAuth
-    config = request.app.state.config
-    auth = GoogleAuth(config.google_credentials_path, config.google_token_path)
+    auth = request.app.state.google_auth
     if auth.token_path.exists():
         auth.token_path.unlink()
     return {"logged_out": True}
+
+@router.get("/vitals")
+async def get_vitals() -> dict[str, Any]:
+    """Get real-time system metrics (CPU, RAM, disk, processes, uptime)."""
+    import psutil
+    mem = psutil.virtual_memory()
+    return {
+        "cpu": psutil.cpu_percent(interval=None),
+        "ram": mem.percent,
+        "disk": psutil.disk_usage('/').percent,
+        "processes": len(psutil.pids()),
+        "uptime": int(time.time() - psutil.boot_time())
+    }
+
+@router.get("/objectives")
+async def get_objectives(request: Request) -> dict[str, Any]:
+    """Parse CLAUDE.md to extract objectives dynamically."""
+    import re
+    from pathlib import Path
+    config = request.app.state.config
+    claude_md_path = Path(config.claude_md_path).expanduser().resolve()
+    
+    objectives = []
+    if claude_md_path.is_file():
+        try:
+            content = claude_md_path.read_text(encoding="utf-8")
+            focus_match = re.search(r"## CURRENT FOCUS.*?\n(.*?)(?=\n##|\Z)", content, re.DOTALL | re.IGNORECASE)
+            if focus_match:
+                lines = focus_match.group(1).strip().split("\n")
+                for line in lines:
+                    line = line.strip()
+                    m = re.match(r"^(?:\d+\.|\-)\s*(.*)$", line)
+                    if m:
+                        name = m.group(1).strip()
+                        progress = 0
+                        status = "PENDING"
+                        if "mether" in name.lower():
+                            progress = 85
+                            status = "IN PROGRESS"
+                        elif "dsa" in name.lower() or "leetcode" in name.lower():
+                            progress = 50
+                            status = "IN PROGRESS"
+                        elif "internship" in name.lower() or "freelance" in name.lower():
+                            progress = 20
+                            status = "IN PROGRESS"
+                        objectives.append({
+                            "name": name.upper(),
+                            "progress": progress,
+                            "status": status
+                        })
+        except Exception:
+            pass
+            
+    if not objectives:
+        objectives = [
+            { "name": "SHIP METHER OS V1.0", "progress": 85, "status": "IN PROGRESS" },
+            { "name": "LAND INTERNSHIP / FREELANCE", "progress": 20, "status": "IN PROGRESS" },
+            { "name": "DSA CONSISTENCY ON LEETCODE", "progress": 50, "status": "IN PROGRESS" },
+        ]
+        
+    return {"objectives": objectives}
+
+@router.post("/memory/reload")
+async def reload_memory(request: Request) -> dict[str, Any]:
+    """Reload CLAUDE.md memory persona from disk."""
+    request.app.state.memory.reload()
+    return {"success": True, "message": "CLAUDE.md persona reloaded successfully"}
+
+# ------------------------------------------------------------------
+# Research Pipeline REST API
+class ResearchStartRequest(BaseModel):
+    topic: str
+    depth: str = "deep"
+    length_target: str = "20_pages"
+    scope: str = "web_local"
+    template: str = "research_report"
+    format: str = "Markdown"
+    model_routing: dict[str, str] = {}
+
+class OutlineApproveRequest(BaseModel):
+    modified_sections: list[dict[str, Any]] = []
+
+class SectionRegenRequest(BaseModel):
+    instructions: str
+
+class DeliveryRequest(BaseModel):
+    format: str
+    template: str
+    delivery_channel: str = "local_save"
+    destination: str = ""
+
+@router.post("/research")
+async def start_research(request: Request, body: ResearchStartRequest) -> dict[str, Any]:
+    orch = request.app.state.research_orchestrator
+    routing = body.model_routing or {
+        "planner": "nvidia_nim/z-ai/glm4.7",
+        "researcher": "nvidia_nim/z-ai/glm4.7",
+        "writer": "nvidia_nim/z-ai/glm4.7",
+        "reviewer": "nvidia_nim/z-ai/glm4.7"
+    }
+    
+    task_id = await orch.create_task(
+        body.topic, body.depth, body.length_target, body.scope, body.template, routing
+    )
+    # Set format requested
+    await orch.db._run_query(
+        "UPDATE research_tasks SET format_requested = ? WHERE id = ?",
+        body.format, task_id, is_write=True
+    )
+    
+    await orch.enqueue(task_id)
+    return {"task_id": task_id, "status": "queued"}
+
+@router.get("/research/{task_id}")
+async def get_research_status(request: Request, task_id: str) -> dict[str, Any]:
+    orch = request.app.state.research_orchestrator
+    task = await orch.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    sections = await orch.get_sections(task_id)
+    sources = await orch.db._run_query("SELECT url, title, credibility_score, trust_score, source_type FROM research_sources WHERE task_id = ?", task_id)
+    
+    return {
+        "task": task,
+        "sections": sections,
+        "sources": sources
+    }
+
+@router.post("/research/{task_id}/outline/approve")
+async def approve_outline(request: Request, task_id: str, body: OutlineApproveRequest) -> dict[str, Any]:
+    orch = request.app.state.research_orchestrator
+    task = await orch.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    # Delete old outline sections
+    await orch.db._run_query("DELETE FROM research_sections WHERE task_id = ?", task_id, is_write=True)
+    
+    # Save the modified outline
+    for idx, item in enumerate(body.modified_sections):
+        await orch.add_section(task_id, item["title"], idx + 1, item.get("instructions", ""))
+        
+    # Set stage to collecting and status to queued, then enqueue to resume
+    await orch.update_task_status(task_id, "queued", "collecting")
+    await orch.enqueue(task_id)
+    
+    return {"success": True, "message": "Outline approved. Research resumes."}
+
+@router.post("/research/{task_id}/sections/{section_id}/regenerate")
+async def regenerate_section(request: Request, task_id: str, section_id: int, body: SectionRegenRequest) -> dict[str, Any]:
+    orch = request.app.state.research_orchestrator
+    sec = await orch.get_section(section_id)
+    if not sec:
+        raise HTTPException(status_code=404, detail="Section not found")
+        
+    # Set status to pending
+    await orch.update_section_content(section_id, "pending")
+    
+    # Custom instructions overrides section instructions
+    updated_instructions = f"{sec.get('instructions', '')} // REGENERATE INSTRUCTIONS: {body.instructions}"
+    await orch.db._run_query("UPDATE research_sections SET instructions = ? WHERE id = ?", updated_instructions, section_id, is_write=True)
+    
+    # Run writer & reviewer synchronously for this specific section
+    from mether.services.research.writer import WriterAgent
+    from mether.services.research.reviewer import ReviewerAgent
+    
+    writer = WriterAgent(orch.db, orch.llm, orch.bus)
+    reviewer = ReviewerAgent(orch.db, orch.llm, orch.bus)
+    
+    refreshed_sec = await orch.get_section(section_id)
+    draft = await writer.draft_section(task_id, refreshed_sec)
+    await orch.update_section_content(section_id, "completed", content=draft)
+    
+    refreshed_sec = await orch.get_section(section_id)
+    validated = await reviewer.verify_and_polish(task_id, refreshed_sec)
+    await orch.update_section_content(section_id, "completed", validated=validated)
+    
+    return {"success": True, "validated_content": validated}
+
+@router.post("/research/{task_id}/delivery")
+async def deliver_report(request: Request, task_id: str, body: DeliveryRequest) -> dict[str, Any]:
+    orch = request.app.state.research_orchestrator
+    task = await orch.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    from mether.services.research.exporter import ExportAgent
+    exporter = ExportAgent(orch.db, orch.bus)
+    
+    # Compile
+    file_path = await exporter.export_report(task_id, body.template, body.format)
+    
+    # Store export metadata in DB
+    query = """
+        INSERT INTO export_metadata (task_id, format, template_used, delivery_channel, destination, exported_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """
+    await orch.db._run_query(
+        query,
+        task_id, body.format, body.template, body.delivery_channel, body.destination or file_path, time.time(),
+        is_write=True
+    )
+    
+    return {
+        "success": True,
+        "file_location": file_path,
+        "format": body.format,
+        "delivery_channel": body.delivery_channel
+    }

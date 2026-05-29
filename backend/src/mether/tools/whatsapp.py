@@ -7,6 +7,7 @@ from mether.utils.whatsapp_formatter import format_for_whatsapp
 from mether.tools.base import BaseTool, SecurityLevel, ToolResult
 
 HANDLED_CONTACTS: dict[str, Any] = {}
+HANDLED_CONTACTS_LOCK = asyncio.Lock()
 
 
 class WhatsAppTool(BaseTool):
@@ -142,18 +143,19 @@ class WhatsAppTool(BaseTool):
                     contact_id = resolved["id"]
                     resolved_name = resolved["name"]
                     
-                    if active:
-                        HANDLED_CONTACTS[contact_id] = {
-                            "name": resolved_name,
-                            "start_time": time.time(),
-                            "last_activity": time.time(),
-                            "messages": []
-                        }
-                        return ToolResult(success=True, data={"message": f"Now handling {resolved_name}", "contact": resolved_name})
-                    else:
-                        if contact_id in HANDLED_CONTACTS:
-                            HANDLED_CONTACTS[contact_id]["stop_requested"] = True
-                        return ToolResult(success=True, data={"message": f"Stopped handling {resolved_name}. Summary is being generated."})
+                    async with HANDLED_CONTACTS_LOCK:
+                        if active:
+                            HANDLED_CONTACTS[contact_id] = {
+                                "name": resolved_name,
+                                "start_time": time.time(),
+                                "last_activity": time.time(),
+                                "messages": []
+                            }
+                            return ToolResult(success=True, data={"message": f"Now handling {resolved_name}", "contact": resolved_name})
+                        else:
+                            if contact_id in HANDLED_CONTACTS:
+                                HANDLED_CONTACTS[contact_id]["stop_requested"] = True
+                            return ToolResult(success=True, data={"message": f"Stopped handling {resolved_name}. Summary is being generated."})
                 
                 return ToolResult(success=False, error=f"Unknown action: {action}")
             except httpx.HTTPError as e:

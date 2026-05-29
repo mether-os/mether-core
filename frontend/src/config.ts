@@ -3,6 +3,7 @@ const config = {
   wsUrl: import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws",
   version: import.meta.env.VITE_APP_VERSION || "1.0.0-dev",
   isDev: import.meta.env.DEV,
+  apiKey: import.meta.env.VITE_METHER_API_KEY || "",
 }
 
 export default config

@@ -56,7 +56,7 @@ class EventBus:
         Handlers are invoked concurrently via ``asyncio.gather``.
         Individual handler exceptions are logged but do **not** propagate.
         """
-        handlers = self._subscribers.get(event_name)
+        handlers = list(self._subscribers.get(event_name, []))
         if not handlers:
             return
 

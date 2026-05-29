@@ -1,6 +1,12 @@
 @echo off
 title METHER OS — First Time Setup
 
+:: Deactivate any active virtualenv to avoid dependency conflicts
+if defined VIRTUAL_ENV (
+    echo [METHER] Active virtual environment detected. Deactivating...
+    call deactivate 2>nul
+)
+
 echo.
 echo  ╔══════════════════════════════════════════╗
 echo  ║      METHER OS — FIRST TIME SETUP        ║

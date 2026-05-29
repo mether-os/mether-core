@@ -50,7 +50,7 @@ async def main():
     # ── Wake word ─────────────────────────────────────────────
     wake_word = os.getenv("WAKE_WORD", "hey mether")
     wake = WakeWordDetector(wake_word)
-    print(f"[METHER-VOICE] ✓ Wake word detector loaded  ({wake_word})")
+    print(f"[METHER-VOICE] ✓ Wake word detector ready  (listening for: '{wake.active_wake_word}')")
 
     # ── Speech-to-text ────────────────────────────────────────
     whisper_model = os.getenv("WHISPER_MODEL", "base")
@@ -67,7 +67,8 @@ async def main():
     # ── Backend client ────────────────────────────────────────
     backend_url = os.getenv("METHER_BACKEND_URL", "http://localhost:8000")
     ws_url = os.getenv("VOICE_WS_URL", "ws://localhost:8000/ws/voice")
-    mether = METHERClient(base_url=backend_url, ws_url=ws_url)
+    api_key = os.getenv("METHER_API_KEY")
+    mether = METHERClient(base_url=backend_url, ws_url=ws_url, api_key=api_key)
 
     print(f"[METHER-VOICE] Connecting to METHER backend ({backend_url})...")
     try:

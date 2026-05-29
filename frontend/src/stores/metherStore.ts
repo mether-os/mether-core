@@ -81,6 +81,10 @@ interface MetherState {
   activeTool: string;
   setActiveTool: (tool: string) => void;
 
+  /* Active model name (fetched from /api/v1/status) */
+  activeModel: string;
+  setActiveModel: (name: string) => void;
+
   /* Session stats */
   sessionStats: SessionStats;
   incrementStat: (key: keyof SessionStats, amount?: number) => void;
@@ -126,10 +130,18 @@ interface MetherState {
   setTerminalCommand: (cmd: string | null) => void;
   setTerminalProcessExit: (code: number | null) => void;
   setTerminalPinned: (pinned: boolean) => void;
+
+  /* WhatsApp QR, Status & Google Auth Status */
+  whatsappStatus: "connected" | "disconnected";
+  setWhatsappStatus: (s: "connected" | "disconnected") => void;
+  whatsappQR: string | null;
+  setWhatsappQR: (qr: string | null) => void;
+  googleAuthStatus: boolean;
+  setGoogleAuthStatus: (auth: boolean) => void;
 }
 
 /* ── Helpers ── */
-let _nextLogId = 0;
+// React-safe log id generator helper
 
 function timestamp(): string {
   return new Date().toLocaleTimeString("en-GB", {
@@ -168,7 +180,7 @@ export const useMetherStore = create<MetherState>((set) => ({
   addLog: (module, message) =>
     set((state) => {
       const entry: LogEntry = {
-        id: _nextLogId++,
+        id: Date.now() + Math.random(),
         time: timestamp(),
         module,
         message,
@@ -197,6 +209,10 @@ export const useMetherStore = create<MetherState>((set) => ({
   activeTool: "STANDBY",
   setActiveTool: (tool) => set({ activeTool: tool }),
 
+  /* Active model */
+  activeModel: "…",
+  setActiveModel: (name) => set({ activeModel: name }),
+
   /* Session stats */
   sessionStats: { commands: 0, toolsUsed: 0, memoryHits: 0, tokens: 0 },
   incrementStat: (key, amount = 1) =>
@@ -209,7 +225,13 @@ export const useMetherStore = create<MetherState>((set) => ({
 
   /* Demo */
   isDemo: true,
-  setDemo: (on) => set({ isDemo: on }),
+  setDemo: (on) =>
+    set((state) => {
+      if (state.isDemo && !on) {
+        return { isDemo: on, logs: [] };
+      }
+      return { isDemo: on };
+    }),
 
   /* Response Display */
   activeResponse: null,
@@ -264,4 +286,12 @@ export const useMetherStore = create<MetherState>((set) => ({
   setTerminalCommand: (cmd) => set({ terminalCommand: cmd }),
   setTerminalProcessExit: (code) => set({ terminalProcessExit: code }),
   setTerminalPinned: (pinned) => set({ terminalPinned: pinned }),
+
+  /* WhatsApp QR, Status & Google Auth Status */
+  whatsappStatus: "disconnected",
+  setWhatsappStatus: (s) => set({ whatsappStatus: s }),
+  whatsappQR: null,
+  setWhatsappQR: (qr) => set({ whatsappQR: qr }),
+  googleAuthStatus: false,
+  setGoogleAuthStatus: (auth) => set({ googleAuthStatus: auth }),
 }));

@@ -1,9 +1,11 @@
 """System Control Tools for METHER OS."""
 
+from typing import Any
 import os
 import glob
 import subprocess
 import platform
+import time
 from pathlib import Path
 
 import psutil
@@ -27,7 +29,7 @@ class AppLaunchTool(BaseTool):
             "required": ["app"]
         }
 
-    async def execute(self, app: str, **kwargs) -> ToolResult:
+    async def execute(self, app: str, **kwargs) -> ToolResult:  # type: ignore[override]
         APP_ALIASES = {
             "chrome":    {"win": "chrome",          "linux": "google-chrome"},
             "firefox":   {"win": "firefox",         "linux": "firefox"},
@@ -66,7 +68,7 @@ class AppLaunchTool(BaseTool):
 class CodeRunTool(BaseTool):
     name = "code_run"
     description = "Execute a shell command or run a code file. Use for: running python scripts, npm commands, git operations, terminal commands."
-    security_level = SecurityLevel.WRITE
+    security_level = SecurityLevel.DANGEROUS
 
     def __init__(self, bus=None):
         self.bus = bus
@@ -82,7 +84,7 @@ class CodeRunTool(BaseTool):
             "required": ["command"]
         }
 
-    async def execute(self, command: str, cwd: str = None, timeout: int = 30, **kwargs) -> ToolResult:
+    async def execute(self, command: str, cwd: str = None, timeout: int = 30, **kwargs) -> ToolResult:  # type: ignore[override]
         BLOCKED = ["rm -rf /", "format c:", "del /s /q c:\\", ":(){ :|:& };:"]
         if any(b in command.lower() for b in BLOCKED):
             return ToolResult(success=False, error="Blocked: dangerous command pattern")
@@ -96,12 +98,26 @@ class CodeRunTool(BaseTool):
                 cwd=target_cwd
             )
             
+            start_time = time.time()
             output_lines = []
             while True:
                 if process.stdout is None:
                     break
+                
+                elapsed = time.time() - start_time
+                remaining = timeout - elapsed
+                if remaining <= 0:
+                    if self.bus:
+                        await self.bus.emit("ws.send", {
+                            "type": "terminal_line",
+                            "line": f"[Timeout after {timeout}s]",
+                            "command": command
+                        })
+                    process.terminate()
+                    break
+                    
                 try:
-                    line_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=timeout)
+                    line_bytes = await asyncio.wait_for(process.stdout.readline(), timeout=remaining)
                 except asyncio.TimeoutError:
                     if self.bus:
                         await self.bus.emit("ws.send", {
@@ -146,6 +162,11 @@ class FileSystemTool(BaseTool):
     description = "Read files, list directories, search for files, create files. For reading code, configs, logs. NOT for deleting."
     security_level = SecurityLevel.READ
 
+    def get_security_level(self, action: str, **kwargs: Any) -> SecurityLevel:
+        if action == "write":
+            return SecurityLevel.DANGEROUS
+        return SecurityLevel.READ
+
     def get_parameters_schema(self) -> dict:
         return {
             "type": "object",
@@ -158,11 +179,9 @@ class FileSystemTool(BaseTool):
             "required": ["action"]
         }
 
-    async def execute(self, action: str, path: str = None, query: str = None, content: str = None, **kwargs) -> ToolResult:
+    async def execute(self, action: str, path: str = None, query: str = None, content: str = None, **kwargs) -> ToolResult:  # type: ignore[override]
         # Override security_level dynamically if writing
-        if action == "write":
-            # Although the object has SecurityLevel.READ, the agent expects writes to be WRITE level. 
-            pass
+        pass
 
         base_path = Path.home()
         target = Path(path).expanduser() if path else base_path
@@ -237,6 +256,11 @@ class ProcessTool(BaseTool):
     description = "List running processes, get system info, kill a process."
     security_level = SecurityLevel.READ
 
+    def get_security_level(self, action: str, **kwargs: Any) -> SecurityLevel:
+        if action == "kill":
+            return SecurityLevel.DANGEROUS
+        return SecurityLevel.READ
+
     def get_parameters_schema(self) -> dict:
         return {
             "type": "object",
@@ -248,7 +272,7 @@ class ProcessTool(BaseTool):
             "required": ["action"]
         }
 
-    async def execute(self, action: str, name: str = None, pid: int = None, **kwargs) -> ToolResult:
+    async def execute(self, action: str, name: str = None, pid: int = None, **kwargs) -> ToolResult:  # type: ignore[override]
         try:
             if action == "list":
                 procs = []
@@ -269,12 +293,18 @@ class ProcessTool(BaseTool):
                 return ToolResult(success=True, data=procs[:20])
             
             elif action == "info":
+                import sys
+                mem = psutil.virtual_memory()
                 return ToolResult(success=True, data={
                     "cpu": psutil.cpu_percent(interval=0.1),
-                    "ram": psutil.virtual_memory().percent,
+                    "ram": mem.percent,
+                    "ram_used_gb": round(mem.used / (1024**3), 1),
+                    "ram_total_gb": round(mem.total / (1024**3), 1),
                     "disk": psutil.disk_usage('/').percent,
                     "processes": len(psutil.pids()),
-                    "uptime_hours": round((psutil.boot_time() - psutil.boot_time()) / 3600, 2)  # psutil boot_time is absolute
+                    "uptime_seconds": int(time.time() - psutil.boot_time()),
+                    "uptime_hours": round((time.time() - psutil.boot_time()) / 3600, 2),
+                    "platform": sys.platform
                 })
             
             elif action == "kill":
@@ -313,7 +343,7 @@ class ClipboardTool(BaseTool):
             "required": ["action"]
         }
 
-    async def execute(self, action: str, text: str = None, **kwargs) -> ToolResult:
+    async def execute(self, action: str, text: str = None, **kwargs) -> ToolResult:  # type: ignore[override]
         try:
             if action == "read":
                 content = pyperclip.paste()

@@ -121,6 +121,7 @@ def _strip_markdown(text: str) -> str:
 
 def _strip_ai_preamble(text: str) -> str:
     """Remove common AI assistant opening phrases."""
+    text = text.strip()  # Ensure anchored ^ patterns work even with leading whitespace/newlines
     for pattern in _AI_PREAMBLES:
         text = re.sub(pattern, "", text, count=1, flags=re.IGNORECASE)
     return text.strip()

@@ -17,9 +17,9 @@ from mether.api.routes import router, root_router
 from mether.api.websocket import websocket_endpoint, voice_ws
 from mether.config import Settings, get_settings
 from mether.events.bus import EventBus
-from mether.memory.context import ContextMemory
+from mether.memory import ContextMemory, PersistentMemory
 from mether.tools.registry import ToolRegistry
-from mether.tools.system import SystemTool
+from mether.tools.memory import SearchMemoryTool, MemoryTimelineTool, GetMemoryObservationsTool
 from mether.tools.whatsapp import WhatsAppTool, HANDLED_CONTACTS
 from mether.tools.system_control import (
     AppLaunchTool, CodeRunTool, FileSystemTool, ProcessTool, ClipboardTool, ScreenshotTool
@@ -141,9 +141,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # 5. Init LLMClient
     llm = LLMClient(config=config)
 
+    # 5.5 Init PersistentMemory
+    persistent_memory = PersistentMemory(db_path=config.memory_db_resolved, llm=llm, bus=bus)
+
     # 6. Init ToolRegistry + register built-in tools
     tools = ToolRegistry()
-    tools.register(SystemTool())
     tools.register(WhatsAppTool())
     tools.register(AppLaunchTool())
     tools.register(CodeRunTool(bus=bus))
@@ -151,6 +153,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tools.register(ProcessTool())
     tools.register(ClipboardTool())
     tools.register(ScreenshotTool())
+    tools.register(SearchMemoryTool(persistent_memory))
+    tools.register(MemoryTimelineTool(persistent_memory))
+    tools.register(GetMemoryObservationsTool(persistent_memory))
 
     google_auth = GoogleAuth(
       credentials_path=config.google_credentials_path,
@@ -168,16 +173,26 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         message="Download from Google Cloud Console to enable Google tools"
       )
 
+    # 6.5 Init Research Pipeline
+    from mether.services.research import ResearchOrchestrator
+    from mether.tools.research_tool import ResearchPipelineTool
+    research_orchestrator = ResearchOrchestrator(persistent_memory, llm, bus)
+    tools.register(ResearchPipelineTool(research_orchestrator))
+
     # 7. Init METHERAgent
-    agent = METHERAgent(llm=llm, tools=tools, memory=memory, bus=bus)
+    agent = METHERAgent(llm=llm, tools=tools, memory=memory, bus=bus, persistent_memory=persistent_memory)
+    await agent.start()
 
     # Store everything on app.state for access in routes / ws
     app.state.config = config
     app.state.bus = bus
     app.state.memory = memory
+    app.state.persistent_memory = persistent_memory
     app.state.llm = llm
     app.state.tools = tools
     app.state.agent = agent
+    app.state.google_auth = google_auth
+    app.state.research_orchestrator = research_orchestrator
     app.state.ws_client_count = 0
 
     log.info(
@@ -229,11 +244,21 @@ app.include_router(router)
 @app.websocket("/ws")
 async def ws(websocket: WebSocket) -> None:
     """WebSocket entry point — delegates to the handler module."""
+    token = websocket.query_params.get("token")
+    config = app.state.config
+    if config.mether_api_key and token != config.mether_api_key:
+        await websocket.close(code=4003)
+        return
     await websocket_endpoint(websocket, app.state.agent, app.state.bus)
 
 @app.websocket("/ws/voice")
 async def ws_voice(websocket: WebSocket) -> None:
     """WebSocket entry point for voice sidecar."""
+    token = websocket.query_params.get("token")
+    config = app.state.config
+    if config.mether_api_key and token != config.mether_api_key:
+        await websocket.close(code=4003)
+        return
     await voice_ws(websocket)
 
 
