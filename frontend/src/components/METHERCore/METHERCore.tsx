@@ -24,6 +24,21 @@ const STATE_GLOW: Record<string, { bg: number; bloom: number }> = {
 
 const chromaticOffset = new Vector2(0.0008, 0.0008)
 
+const WAVEFORM_BARS = [
+  { height: 45, duration: 0.45, opacity: 0.8 },
+  { height: 85, duration: 0.62, opacity: 0.9 },
+  { height: 55, duration: 0.38, opacity: 0.7 },
+  { height: 95, duration: 0.71, opacity: 0.95 },
+  { height: 65, duration: 0.50, opacity: 0.85 },
+  { height: 35, duration: 0.31, opacity: 0.65 },
+  { height: 75, duration: 0.58, opacity: 0.88 },
+  { height: 50, duration: 0.42, opacity: 0.75 },
+  { height: 90, duration: 0.68, opacity: 0.92 },
+  { height: 40, duration: 0.35, opacity: 0.7 },
+  { height: 80, duration: 0.55, opacity: 0.85 },
+  { height: 60, duration: 0.48, opacity: 0.78 },
+]
+
 export default function METHERCore({ state, onActivate }: METHERCoreProps) {
   const { bg, bloom } = STATE_GLOW[state] ?? STATE_GLOW.idle
 
@@ -106,15 +121,15 @@ export default function METHERCore({ state, onActivate }: METHERCoreProps) {
         </div>
         {state === 'listening' && (
           <div className="flex gap-[3px] items-end h-5 mt-1">
-            {Array.from({ length: 12 }).map((_, i) => (
+            {WAVEFORM_BARS.map((bar, i) => (
               <div
                 key={i}
                 className="w-[2px] bg-primary rounded-none"
                 style={{
-                  height: `${30 + Math.random() * 70}%`,
-                  animation: `waveform ${0.25 + Math.random() * 0.5}s ease-in-out infinite alternate`,
+                  height: `${bar.height}%`,
+                  animation: `waveform ${bar.duration}s ease-in-out infinite alternate`,
                   animationDelay: `${i * 0.04}s`,
-                  opacity: 0.6 + Math.random() * 0.4,
+                  opacity: bar.opacity,
                 }}
               />
             ))}

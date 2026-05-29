@@ -6,6 +6,14 @@ import * as THREE from 'three'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useMetherStore } from '@/stores/metherStore'
 
+const createPRNG = (seed: number) => {
+  let s = seed
+  return () => {
+    s = (s * 9301 + 49297) % 233280
+    return s / 233280
+  }
+}
+
 export type OrbState = 'sleeping' | 'idle' | 'listening' | 'processing' | 'speaking'
 
 export interface VoiceOrbProps {
@@ -16,21 +24,22 @@ export interface VoiceOrbProps {
 // ---- STAR FIELD ----
 function Stars() {
   const geo = useMemo(() => {
+    const random = createPRNG(999)
     const g = new THREE.BufferGeometry()
     const n = 1500
     const pos = new Float32Array(n * 3)
     const col = new Float32Array(n * 3)
     for (let i = 0; i < n; i++) {
-      const r = 5 + Math.random() * 8
-      const t = Math.random() * Math.PI * 2
-      const p = Math.acos(2 * Math.random() - 1)
+      const r = 5 + random() * 8
+      const t = random() * Math.PI * 2
+      const p = Math.acos(2 * random() - 1)
       pos[i*3]   = r * Math.sin(p) * Math.cos(t)
       pos[i*3+1] = r * Math.sin(p) * Math.sin(t)
       pos[i*3+2] = r * Math.cos(p)
-      const isPink = Math.random() < 0.12
-      col[i*3]   = isPink ? 0.95 : 0.5 + Math.random() * 0.5
-      col[i*3+1] = isPink ? 0.2  : 0.6 + Math.random() * 0.4
-      col[i*3+2] = isPink ? 0.8  : 0.9 + Math.random() * 0.1
+      const isPink = random() < 0.12
+      col[i*3]   = isPink ? 0.95 : 0.5 + random() * 0.5
+      col[i*3+1] = isPink ? 0.2  : 0.6 + random() * 0.4
+      col[i*3+2] = isPink ? 0.8  : 0.9 + random() * 0.1
     }
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     g.setAttribute('color',    new THREE.BufferAttribute(col, 3))
@@ -55,7 +64,6 @@ function Stars() {
 // ---- MAIN SPHERE BODY (fibonacci distribution, 10000 particles) ----
 function Spherebody({ state }: { state: string }) {
   const ref = useRef<THREE.Points>(null!)
-  const matRef = useRef<THREE.ShaderMaterial>(null!)
   const clock = useRef(0)
 
   const currentEnergy = useRef(0.4)
@@ -63,6 +71,7 @@ function Spherebody({ state }: { state: string }) {
   const currentBreath = useRef(1.0)
 
   const { geo } = useMemo(() => {
+    const random = createPRNG(8888)
     const N = 10000
     const pos   = new Float32Array(N * 3)
     const col   = new Float32Array(N * 3)
@@ -73,7 +82,7 @@ function Spherebody({ state }: { state: string }) {
       const y     = 1 - (i / (N - 1)) * 2
       const rad   = Math.sqrt(Math.max(0, 1 - y * y))
       const theta = phi * i
-      const jitter = 0.06 * (Math.random() - 0.5)
+      const jitter = 0.06 * (random() - 0.5)
       const r = 1.0 + jitter
 
       pos[i*3]   = Math.cos(theta) * rad * r
@@ -82,20 +91,20 @@ function Spherebody({ state }: { state: string }) {
 
       // Color: cyan top, blue mid, purple bottom + pink accents
       const h = (y + 1) / 2 // 0-1
-      const isAccent = Math.random() < 0.07
+      const isAccent = random() < 0.07
 
       if (isAccent) {
         col[i*3] = 0.88; col[i*3+1] = 0.15; col[i*3+2] = 0.85 // pink
-        sizes[i] = 0.014 + Math.random() * 0.008
+        sizes[i] = 0.014 + random() * 0.008
       } else if (h > 0.65) {
         col[i*3] = 0.1;  col[i*3+1] = 0.82; col[i*3+2] = 0.95 // cyan
-        sizes[i] = 0.005 + Math.random() * 0.005
+        sizes[i] = 0.005 + random() * 0.005
       } else if (h > 0.35) {
         col[i*3] = 0.18; col[i*3+1] = 0.35; col[i*3+2] = 0.92 // blue
-        sizes[i] = 0.004 + Math.random() * 0.006
+        sizes[i] = 0.004 + random() * 0.006
       } else {
         col[i*3] = 0.55; col[i*3+1] = 0.12; col[i*3+2] = 0.82 // purple
-        sizes[i] = 0.005 + Math.random() * 0.007
+        sizes[i] = 0.005 + random() * 0.007
       }
     }
 
@@ -155,8 +164,6 @@ function Spherebody({ state }: { state: string }) {
     vertexColors: true,
   }), [])
 
-  matRef.current = mat
-
   const speedMap: Record<string, number> = {
     sleeping: 0.04, idle: 0.12, listening: 0.28, processing: 0.5, speaking: 0.38
   }
@@ -177,21 +184,26 @@ function Spherebody({ state }: { state: string }) {
     // Lerp speed & energy: 0.025 = smooth ~1.5s transition
     currentEnergy.current += (targetEnergy - currentEnergy.current) * 0.025
     currentSpeed.current  += (targetSpeed  - currentSpeed.current)  * 0.025
-    mat.uniforms.uColorMix.value += (targetMix - mat.uniforms.uColorMix.value) * 0.02
 
-    // Lerp breath scale dynamically
-    let targetBreath = 1.0 + Math.sin(t * 0.9) * 0.022
-    if (state === 'speaking') {
-      targetBreath *= 1.0 + Math.sin(t * 11) * 0.035 + Math.sin(t * 7) * 0.018
+    // Get the material from the ref to avoid mutating rendering-context variables
+    const material = ref.current?.material as THREE.ShaderMaterial
+    if (material && material.uniforms) {
+      material.uniforms.uColorMix.value += (targetMix - material.uniforms.uColorMix.value) * 0.02
+
+      // Lerp breath scale dynamically
+      let targetBreath = 1.0 + Math.sin(t * 0.9) * 0.022
+      if (state === 'speaking') {
+        targetBreath *= 1.0 + Math.sin(t * 11) * 0.035 + Math.sin(t * 7) * 0.018
+      }
+      currentBreath.current += (targetBreath - currentBreath.current) * 0.025
+
+      ref.current.rotation.y += 0.004 * currentSpeed.current * 8
+      ref.current.rotation.x += 0.0015 * currentSpeed.current * 8
+
+      material.uniforms.uTime.value   = t
+      material.uniforms.uEnergy.value = currentEnergy.current
+      material.uniforms.uBreath.value = currentBreath.current
     }
-    currentBreath.current += (targetBreath - currentBreath.current) * 0.025
-
-    ref.current.rotation.y += 0.004 * currentSpeed.current * 8
-    ref.current.rotation.x += 0.0015 * currentSpeed.current * 8
-
-    mat.uniforms.uTime.value   = t
-    mat.uniforms.uEnergy.value = currentEnergy.current
-    mat.uniforms.uBreath.value = currentBreath.current
   })
 
   // Cleanup geometries & shaders
@@ -213,12 +225,12 @@ function Ribbon({
   color1: string; color2: string; particleCount: number; state: string
 }) {
   const ref   = useRef<THREE.Points>(null!)
-  const matRef = useRef<THREE.PointsMaterial>(null!)
   const t = useRef(phaseOffset)
   const currentSpeed = useRef(0.9)
   const currentOpacity = useRef(0.85)
 
   const geo = useMemo(() => {
+    const random = createPRNG(4567 + phaseOffset)
     const N   = particleCount
     const pos = new Float32Array(N * 3)
     const col = new Float32Array(N * 3)
@@ -227,7 +239,7 @@ function Ribbon({
 
     for (let i = 0; i < N; i++) {
       const angle    = (i / N) * Math.PI * 2
-      const bandW    = (Math.random() - 0.5) * 0.14
+      const bandW    = (random() - 0.5) * 0.14
       const r        = 1.03 + Math.abs(bandW) * 0.5
       pos[i*3]   = Math.cos(angle) * r
       pos[i*3+1] = bandW * 2.5 + Math.sin(angle * 2) * 0.06
@@ -242,7 +254,7 @@ function Ribbon({
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
     g.setAttribute('color',    new THREE.BufferAttribute(col, 3))
     return g
-  }, [particleCount, color1, color2])
+  }, [particleCount, color1, color2, phaseOffset])
 
   const mat = useMemo(() => new THREE.PointsMaterial({
     size: 0.009,
@@ -254,8 +266,6 @@ function Ribbon({
     sizeAttenuation: true,
   }), [])
 
-  matRef.current = mat
-
   const spdMap: Record<string,number> = {
     sleeping:0.3, idle:0.9, listening:1.6, processing:2.4, speaking:2.0
   }
@@ -265,16 +275,22 @@ function Ribbon({
     currentSpeed.current += (targetSpeed - currentSpeed.current) * 0.02
     t.current += dt * speed * currentSpeed.current
 
-    ref.current.rotation.set(tiltX, t.current, tiltZ)
+    if (ref.current) {
+      ref.current.rotation.set(tiltX, t.current, tiltZ)
 
-    const targetOpacity = state === 'speaking' ? 1.0
-      : state === 'listening' ? 0.95
-      : state === 'processing' ? 0.98
-      : 0.75
+      const targetOpacity = state === 'speaking' ? 1.0
+        : state === 'listening' ? 0.95
+        : state === 'processing' ? 0.98
+        : 0.75
 
-    currentOpacity.current += (targetOpacity - currentOpacity.current) * 0.03
-    const pulse = 0.8 + 0.2 * Math.sin(t.current * 2.5)
-    mat.opacity = currentOpacity.current * pulse
+      currentOpacity.current += (targetOpacity - currentOpacity.current) * 0.03
+      const pulse = 0.8 + 0.2 * Math.sin(t.current * 2.5)
+
+      const material = ref.current.material as THREE.PointsMaterial
+      if (material) {
+        material.opacity = currentOpacity.current * pulse
+      }
+    }
   })
 
   // Cleanup

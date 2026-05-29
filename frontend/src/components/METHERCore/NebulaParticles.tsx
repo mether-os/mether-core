@@ -3,6 +3,14 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { createNoise3D } from 'simplex-noise'
 
+const createPRNG = (seed: number) => {
+  let s = seed
+  return () => {
+    s = (s * 9301 + 49297) % 233280
+    return s / 233280
+  }
+}
+
 interface NebulaParticlesProps {
   state: string
 }
@@ -16,6 +24,7 @@ export default function NebulaParticles({ state }: NebulaParticlesProps) {
 
   // Inner shell — 2000 particles tightly around the sphere
   const inner = useMemo(() => {
+    const random = createPRNG(42)
     const count = 2000
     const pos = new Float32Array(count * 3)
     const col = new Float32Array(count * 3)
@@ -24,7 +33,7 @@ export default function NebulaParticles({ state }: NebulaParticlesProps) {
     for (let i = 0; i < count; i++) {
       const phi = Math.acos(1 - 2 * (i + 0.5) / count)
       const theta = Math.PI * (1 + Math.sqrt(5)) * i
-      const r = 1.15 + Math.random() * 0.4
+      const r = 1.15 + random() * 0.4
 
       pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta)
       pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
@@ -35,35 +44,36 @@ export default function NebulaParticles({ state }: NebulaParticlesProps) {
       col[i * 3 + 1] = 0.7 - t * 0.35
       col[i * 3 + 2] = 0.85 + t * 0.15
 
-      speeds[i] = 0.3 + Math.random() * 0.7
+      speeds[i] = 0.3 + random() * 0.7
     }
     return { pos, col, speeds, count }
   }, [])
 
   // Outer nebula — 1200 particles in a large cloud
   const outer = useMemo(() => {
+    const random = createPRNG(1337)
     const count = 1200
     const pos = new Float32Array(count * 3)
     const col = new Float32Array(count * 3)
 
     for (let i = 0; i < count; i++) {
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
-      const r = 2.0 + Math.random() * 2.5
+      const theta = random() * Math.PI * 2
+      const phi = Math.acos(2 * random() - 1)
+      const r = 2.0 + random() * 2.5
 
       pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta)
       pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.65
       pos[i * 3 + 2] = r * Math.cos(phi)
 
-      const isCyan = Math.random() > 0.45
+      const isCyan = random() > 0.45
       if (isCyan) {
-        col[i * 3] = 0.12 + Math.random() * 0.15
-        col[i * 3 + 1] = 0.7 + Math.random() * 0.25
-        col[i * 3 + 2] = 0.88 + Math.random() * 0.12
+        col[i * 3] = 0.12 + random() * 0.15
+        col[i * 3 + 1] = 0.7 + random() * 0.25
+        col[i * 3 + 2] = 0.88 + random() * 0.12
       } else {
-        col[i * 3] = 0.4 + Math.random() * 0.3
-        col[i * 3 + 1] = 0.1 + Math.random() * 0.2
-        col[i * 3 + 2] = 0.7 + Math.random() * 0.28
+        col[i * 3] = 0.4 + random() * 0.3
+        col[i * 3 + 1] = 0.1 + random() * 0.2
+        col[i * 3 + 2] = 0.7 + random() * 0.28
       }
     }
     return { pos, col, count }
