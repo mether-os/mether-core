@@ -154,12 +154,301 @@ class PersistentMemory:
                     FOREIGN KEY(task_id) REFERENCES research_tasks(id) ON DELETE CASCADE
                 );
             """)
+
+            # Chief of Staff Tables
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS goals (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    category TEXT NOT NULL,
+                    target_date TEXT,
+                    status TEXT NOT NULL,
+                    health_score REAL DEFAULT 100.0,
+                    streak INTEGER DEFAULT 0,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS milestones (
+                    id TEXT PRIMARY KEY,
+                    goal_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    due_date TEXT,
+                    status TEXT NOT NULL,
+                    order_idx INTEGER NOT NULL,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(goal_id) REFERENCES goals(id) ON DELETE CASCADE
+                );
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id TEXT PRIMARY KEY,
+                    milestone_id TEXT NOT NULL,
+                    goal_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    priority TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    due_date TEXT,
+                    time_estimate_mins INTEGER DEFAULT 0,
+                    time_invested_mins INTEGER DEFAULT 0,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    FOREIGN KEY(milestone_id) REFERENCES milestones(id) ON DELETE CASCADE,
+                    FOREIGN KEY(goal_id) REFERENCES goals(id) ON DELETE CASCADE
+                );
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS subtasks (
+                    id TEXT PRIMARY KEY,
+                    task_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+                );
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS progress_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    goal_id TEXT NOT NULL,
+                    task_id TEXT,
+                    log_type TEXT NOT NULL,
+                    notes TEXT,
+                    timestamp REAL NOT NULL,
+                    FOREIGN KEY(goal_id) REFERENCES goals(id) ON DELETE CASCADE
+                );
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS weekly_reviews (
+                    id TEXT PRIMARY KEY,
+                    week_start TEXT NOT NULL,
+                    week_end TEXT NOT NULL,
+                    accomplishments TEXT NOT NULL,
+                    missed_targets TEXT NOT NULL,
+                    risks TEXT NOT NULL,
+                    recommendations TEXT NOT NULL,
+                    generated_at REAL NOT NULL
+                );
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS daily_priorities (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT UNIQUE NOT NULL,
+                    priorities_json TEXT NOT NULL,
+                    blockers_json TEXT NOT NULL,
+                    focus_area TEXT NOT NULL,
+                    generated_at REAL NOT NULL
+                );
+            """)
+
             # Create indexes for search performance
             conn.execute("CREATE INDEX IF NOT EXISTS idx_obs_session ON observations(session_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_obs_type ON observations(type);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_res_sections ON research_sections(task_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_res_sources ON research_sources(task_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_res_citations ON citations(task_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cos_milestones ON milestones(goal_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cos_tasks_goal ON tasks(goal_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cos_tasks_milestone ON tasks(milestone_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cos_subtasks ON subtasks(task_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_cos_progress_logs ON progress_logs(goal_id);")
+
+            # Decision Intelligence Engine Tables
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS evidence_vault (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    title TEXT,
+                    snapshot_text TEXT,
+                    retrieved_at REAL NOT NULL,
+                    quality_score REAL NOT NULL,
+                    independence_score REAL,
+                    extracted_claims_json TEXT,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS research_claims (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    section_id INTEGER,
+                    claim_text TEXT NOT NULL,
+                    evidence TEXT NOT NULL,
+                    source_id INTEGER,
+                    source_url TEXT NOT NULL,
+                    vault_id INTEGER,
+                    verification_status TEXT NOT NULL,
+                    confidence_score REAL NOT NULL,
+                    confidence_source_quality REAL NOT NULL,
+                    confidence_cross_validation REAL NOT NULL,
+                    confidence_recency REAL NOT NULL,
+                    confidence_independence REAL NOT NULL,
+                    contradiction_penalty REAL DEFAULT 0.0,
+                    cross_validation_count INTEGER DEFAULT 0,
+                    recency_score REAL NOT NULL,
+                    source_quality_score REAL NOT NULL,
+                    retrieved_timestamp REAL NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS research_contradictions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    claim_a_id INTEGER,
+                    claim_b_id INTEGER,
+                    source_a_url TEXT,
+                    source_b_url TEXT,
+                    field_type TEXT NOT NULL,
+                    possible_explanations TEXT NOT NULL,
+                    human_review_recommended INTEGER NOT NULL DEFAULT 1,
+                    confidence REAL NOT NULL,
+                    confidence_penalty_applied REAL NOT NULL DEFAULT 0.20,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS source_independence (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    independence_score REAL NOT NULL,
+                    duplicate_of_url TEXT,
+                    duplication_type TEXT,
+                    similarity_score REAL,
+                    flagged_at REAL NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS source_network (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    parent_url TEXT,
+                    claim_count INTEGER DEFAULT 0,
+                    echo_chamber_risk_score REAL DEFAULT 0.0,
+                    citation_chain_depth INTEGER DEFAULT 0,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS decision_layer (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT UNIQUE NOT NULL,
+                    key_findings TEXT NOT NULL,
+                    green_flags TEXT NOT NULL,
+                    red_flags TEXT NOT NULL,
+                    open_questions TEXT NOT NULL,
+                    risks TEXT NOT NULL,
+                    opportunities TEXT NOT NULL,
+                    decision_summary TEXT NOT NULL,
+                    confidence_level REAL NOT NULL,
+                    target_audience TEXT NOT NULL,
+                    devils_advocate_summary TEXT,
+                    research_failure INTEGER DEFAULT 0,
+                    failure_reason TEXT,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS research_action_plans (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT UNIQUE NOT NULL,
+                    actions_json TEXT NOT NULL,
+                    next_steps_json TEXT NOT NULL,
+                    quick_wins_json TEXT NOT NULL,
+                    long_term_actions_json TEXT NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS devils_advocate (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT UNIQUE NOT NULL,
+                    counter_arguments_json TEXT NOT NULL,
+                    alternative_interpretations_json TEXT NOT NULL,
+                    confidence_risks_json TEXT NOT NULL,
+                    why_wrong_json TEXT NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS research_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    topic_hash TEXT NOT NULL,
+                    task_id TEXT NOT NULL,
+                    snapshot_json TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS recommendation_outcomes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    recommendation_text TEXT NOT NULL,
+                    confidence_at_time REAL NOT NULL,
+                    predicted_outcome TEXT,
+                    actual_outcome TEXT,
+                    user_feedback TEXT,
+                    outcome_timestamp REAL,
+                    correct INTEGER,
+                    topic_hash TEXT NOT NULL,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS accuracy_metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    snapshot_date TEXT NOT NULL,
+                    total_predictions INTEGER NOT NULL,
+                    correct_predictions INTEGER NOT NULL,
+                    prediction_accuracy REAL NOT NULL,
+                    verification_success_rate REAL NOT NULL,
+                    contradiction_detection_rate REAL NOT NULL,
+                    confidence_calibration_score REAL NOT NULL,
+                    avg_source_independence_score REAL NOT NULL,
+                    computed_at REAL NOT NULL
+                );
+            """)
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS human_review_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL,
+                    claim_id INTEGER,
+                    source_url TEXT NOT NULL,
+                    snapshot_excerpt TEXT NOT NULL,
+                    review_reason TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    reviewer_notes TEXT,
+                    reviewed_at REAL,
+                    FOREIGN KEY(task_id) REFERENCES research_tasks(id)
+                );
+            """)
+
+            # Add indexes for Decision Intelligence Engine
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_evidence_vault ON evidence_vault(task_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_claims ON research_claims(task_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_contradictions ON research_contradictions(task_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_source_independence ON source_independence(task_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_research_history ON research_history(topic_hash);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_rec_outcomes ON recommendation_outcomes(task_id);")
 
             # Ensure missing columns exist in research_tasks for existing installations
             for col in ["format_requested", "research_plan"]:
@@ -167,6 +456,28 @@ class PersistentMemory:
                     conn.execute(f"SELECT {col} FROM research_tasks LIMIT 1;")
                 except sqlite3.OperationalError:
                     conn.execute(f"ALTER TABLE research_tasks ADD COLUMN {col} TEXT;")
+
+            # New column migrations on research_tasks for Decision Intelligence Engine
+            for col_def in [
+                ("research_mode", "TEXT DEFAULT 'balanced'"),
+                ("search_budget", "INTEGER DEFAULT 10"),
+                ("time_budget_seconds", "INTEGER DEFAULT 120"),
+                ("token_budget", "INTEGER DEFAULT 25000"),
+                ("searches_used", "INTEGER DEFAULT 0"),
+                ("tokens_used", "INTEGER DEFAULT 0"),
+                ("time_started", "REAL"),
+                ("target_audience", "TEXT DEFAULT 'researcher'"),
+                ("human_review_enabled", "INTEGER DEFAULT 0"),
+                ("research_failed", "INTEGER DEFAULT 0"),
+                ("failure_reason", "TEXT"),
+                ("failure_confidence", "REAL"),
+                ("avg_confidence", "REAL"),
+            ]:
+                col_name, col_type = col_def
+                try:
+                    conn.execute(f"SELECT {col_name} FROM research_tasks LIMIT 1;")
+                except sqlite3.OperationalError:
+                    conn.execute(f"ALTER TABLE research_tasks ADD COLUMN {col_name} {col_type};")
 
             # Ensure missing columns exist in research_sources for existing installations
             try:

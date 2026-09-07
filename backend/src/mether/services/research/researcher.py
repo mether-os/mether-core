@@ -1,12 +1,14 @@
 import time
 import json
 import urllib.parse
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import httpx
 import structlog
 from mether.events.bus import EventBus
 from mether.memory.persistent_memory import PersistentMemory
 from mether.agent.llm import LLMClient
+from mether.services.research.budget_controller import BudgetController
+from mether.services.research.evidence_vault import EvidenceVault
 
 logger = structlog.get_logger(__name__)
 
@@ -66,74 +68,236 @@ Example:
 
 
 class ResearchAgent:
-    """Research Agent: Gathers information from Web and Local Workspace, evaluates credibility, and extracts facts."""
-
-    def __init__(self, db: PersistentMemory, llm: LLMClient, bus: EventBus) -> None:
+    """Research Agent: Gathers information with recursive verification loop.
+    
+    CRITICAL: No fallback fact generation. Search fails = Unknown. Always.
+    """
+    
+    def __init__(
+        self,
+        db: PersistentMemory,
+        llm: LLMClient,
+        bus: EventBus,
+        budget_controller: BudgetController,
+        evidence_vault: EvidenceVault
+    ) -> None:
         self.db = db
         self.llm = llm
         self.bus = bus
-
-    async def gather_information(self, task_id: str, topic: str, sections: List[Dict[str, Any]]) -> None:
-        # 1. Determine scope and check local workspace files
-        # For simplicity, we scan the workspace folder for files matching the topic and ingest them if they exist
+        self.budget = budget_controller
+        self.evidence_vault = evidence_vault
+    
+    async def gather_information(self, task_id: str, topic: str, sections: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Main entry point. Returns {claims: list, unknowns: list, sources: list}"""
         await self._ingest_local_files_if_any(task_id, topic)
         
-        # 2. Iterate through sections and gather info
+        all_claims = []
+        all_unknowns = []
+        all_sources = []
+        
+        from mether.services.research.quality_scorer import score_source, recency_score as get_recency
+        from mether.services.research.claim_verifier import ClaimVerifierAgent
+        verifier = ClaimVerifierAgent(self.db)
+        
         for idx, sec in enumerate(sections):
             section_title = sec["title"]
-            logger.info("researcher.gathering_section", task_id=task_id, section=section_title)
-            
-            # Search web concurrently/sequentially
             search_query = f"{topic} {section_title}"
-            web_results = await self._search_duckduckgo(search_query)
+            section_claims = []
+            section_searches = 0
+            max_section_searches = self.budget.searches_per_section
             
-            # If search returns results, score credibility and extract facts
-            if web_results:
-                # Limit to top 3 web results to save context window and avoid timeouts
+            while section_searches < max_section_searches and self.budget.can_search():
+                web_results = await self._search_duckduckgo(search_query)
+                await self.budget.record_search()
+                section_searches += 1
+                
+                if not web_results:
+                    # Search failed. Mark unknown. Never fabricate.
+                    await self._record_unknown(
+                        task_id, sec["id"], section_title,
+                        "general_information",
+                        "Web search returned no results",
+                        [search_query]
+                    )
+                    break
+                
                 for res in web_results[:3]:
                     url = res["url"]
                     title = res["title"]
                     snippet = res["snippet"]
                     
-                    scores = self._evaluate_credibility(url)
+                    quality = score_source(url)
+                    recency = get_recency(None)  # snippet has no date; default 0.3
                     
-                    # Store source in DB
-                    query_source = """
-                        INSERT INTO research_sources (
-                            task_id, url, title, snippet, source_type, publication_date, author, domain, credibility_score, trust_score
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """
-                    source_id = await self.db._run_query(
-                        query_source,
-                        task_id, url, title, snippet, scores["source_type"], 
-                        scores["pub_date"], scores["author"], scores["domain"],
-                        scores["credibility_score"], scores["trust_score"],
-                        is_write=True
+                    # Vault the source snapshot
+                    vault_id = await self.evidence_vault.store_snapshot(
+                        task_id, url, title, snippet, quality
                     )
                     
-                    # Extract facts via LLM from the snippet
-                    extracted_facts = await self._extract_facts_from_source(title, snippet)
+                    # Store raw source
+                    source_id = await self._store_source(task_id, url, title, snippet, quality)
+                    all_sources.append({"id": source_id, "url": url, "quality": quality, "snapshot_text": snippet})
                     
-                    # Save facts to sources table
-                    await self.db._run_query(
-                        "UPDATE research_sources SET extracted_facts = ? WHERE id = ?",
-                        json.dumps(extracted_facts), source_id, is_write=True
-                    )
-            else:
-                # Internal LLM lookup fallback (hallucination safeguard - extract facts using model memory)
-                fallback_facts = await self._generate_fallback_facts(section_title)
-                query_source = """
-                    INSERT INTO research_sources (
-                        task_id, url, title, snippet, source_type, credibility_score, trust_score, extracted_facts
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """
-                await self.db._run_query(
-                    query_source,
-                    task_id, "internal://knowledge-base", f"Internal Knowledge: {section_title}",
-                    "Facts generated from METHER core model database.", "Research Institution",
-                    0.80, 0.85, json.dumps(fallback_facts),
-                    is_write=True
+                    # Extract and verify claims
+                    extracted = await self._extract_claims_from_source(title, snippet)
+                    for claim_text in extracted:
+                        claim = await verifier.verify_claim(
+                            task_id=task_id,
+                            claim_text=claim_text,
+                            evidence=snippet,
+                            source_url=url,
+                            source_quality=quality,
+                            recency=recency,
+                            independence=0.7,  # default, updated by SourceIndependenceAnalyzer later
+                            cross_validation_count=0,
+                            has_contradiction=False,
+                            mode_threshold=self.budget.confidence_threshold,
+                            vault_id=vault_id,
+                            section_id=sec["id"]
+                        )
+                        claim_id = await verifier.store_claim(task_id, claim)
+                        
+                        # Store in lists
+                        claim_dict = {
+                            "id": claim_id,
+                            "claim_text": claim.claim_text,
+                            "verification_status": claim.verification_status,
+                            "confidence_score": claim.confidence.total,
+                            "cross_validation_count": claim.cross_validation_count,
+                            "source_quality_score": claim.source_quality_score,
+                            "recency_score": claim.recency_score,
+                            "confidence_independence": claim.confidence.independence,
+                            "source_url": claim.source_url,
+                            "section_id": sec["id"]
+                        }
+                        section_claims.append(claim_dict)
+                        all_claims.append(claim_dict)
+                
+                # Check if confidence threshold reached for this section
+                if section_claims:
+                    avg = sum(c["confidence_score"] for c in section_claims) / len(section_claims)
+                    if avg >= self.budget.confidence_threshold:
+                        break
+                
+                # Refine query for next iteration
+                search_query = f"{topic} {section_title} details evidence"
+            
+            # Detect missing information after loop
+            section_unknowns = await self._detect_missing_information(
+                task_id, sec["id"], section_title, topic, section_claims
+            )
+            all_unknowns.extend(section_unknowns)
+        
+        return {"claims": all_claims, "unknowns": all_unknowns, "sources": all_sources}
+    
+    async def _record_unknown(self, task_id: str, section_id: int, section_title: str, field: str, reason: str, queries: List[str]) -> None:
+        """Record a field as explicitly Unknown. This is a first-class output."""
+        import json
+        await self.db._run_query(
+            """INSERT INTO research_claims (
+                task_id, section_id, claim_text, evidence, source_url, vault_id,
+                verification_status, confidence_score,
+                confidence_source_quality, confidence_cross_validation,
+                confidence_recency, confidence_independence, contradiction_penalty,
+                cross_validation_count, recency_score, source_quality_score, retrieved_timestamp
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            task_id, section_id,
+            f"UNKNOWN: {field} for {section_title}",
+            f"No evidence found. Queries attempted: {json.dumps(queries)}",
+            "unknown://not-found", None,
+            "Unverified", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0, 0.0, 0.0, time.time(),
+            is_write=True
+        )
+    
+    async def _detect_missing_information(self, task_id: str, section_id: int, section_title: str, topic: str, section_claims: List[Dict]) -> List[Dict]:
+        """After search loop: flag expected fields with no verified evidence."""
+        unknowns = []
+        expected_fields = self._get_expected_fields(topic)
+        verified_texts = " ".join(
+            c["claim_text"].lower() for c in section_claims
+            if c["verification_status"] in ("Verified", "Partially Verified")
+        )
+        for field in expected_fields:
+            if not any(kw in verified_texts for kw in field["keywords"]):
+                # Record in DB
+                await self._record_unknown(
+                    task_id, section_id, section_title, field["name"],
+                    "No verified evidence found", [topic, section_title]
                 )
+                unknowns.append({
+                    "field": field["name"],
+                    "section_id": section_id,
+                    "section": section_title,
+                    "reason": "No verified evidence found"
+                })
+        return unknowns
+    
+    def _get_expected_fields(self, topic: str) -> List[Dict]:
+        """Return expected research fields based on topic keywords."""
+        topic_lower = topic.lower()
+        if any(k in topic_lower for k in ["company", "startup", "corp", "inc", "ltd", "venture"]):
+            return [
+                {"name": "founding_date", "keywords": ["founded", "established", "started", "incorporated"]},
+                {"name": "headquarters", "keywords": ["located", "headquartered", "office", "based in"]},
+                {"name": "employee_count", "keywords": ["employees", "team", "staff", "headcount"]},
+                {"name": "funding", "keywords": ["funding", "raised", "investment", "series", "seed"]},
+                {"name": "revenue", "keywords": ["revenue", "sales", "income", "arr", "mrr"]},
+                {"name": "products", "keywords": ["product", "service", "solution", "platform"]},
+            ]
+        elif any(k in topic_lower for k in ["person", "ceo", "founder", "director"]):
+            return [
+                {"name": "education", "keywords": ["university", "degree", "studied", "graduated"]},
+                {"name": "career", "keywords": ["worked", "position", "role", "career", "experience"]},
+                {"name": "current_role", "keywords": ["current", "now", "presently", "ceo", "founder"]},
+            ]
+        else:
+            return [
+                {"name": "key_facts", "keywords": ["is", "was", "has", "are", "were"]},
+                {"name": "timeline", "keywords": ["year", "date", "when", "since", "from"]},
+                {"name": "metrics", "keywords": ["number", "count", "amount", "size", "scale"]},
+            ]
+    
+    async def _extract_claims_from_source(self, title: str, snippet: str) -> List[str]:
+        """Extract factual claims from source. Returns list of claim strings."""
+        prompt = f"""You are a forensic research analyst.
+Extract 3-5 specific, verifiable factual claims from this source. 
+Each claim must be a concrete, checkable statement — not vague, not opinion.
+Source: "{title}"
+Content: "{snippet}"
+
+Rules:
+- Only extract what the text explicitly states
+- Never invent or infer beyond the text
+- If no clear facts exist, return empty array
+
+Return JSON array of strings. No markdown wraps."""
+        try:
+            resp = await self.llm.chat(
+                messages=[{"role": "user", "content": prompt}],
+                system="You are a forensic facts extractor. Extract only what is explicitly stated."
+            )
+            content = resp.get("content", [])
+            text = content[0].get("text", "[]") if content else "[]"
+            cleaned = text.strip().lstrip("```json").lstrip("```").rstrip("```").strip()
+            result = json.loads(cleaned)
+            if isinstance(result, list):
+                return [str(f) for f in result]
+        except Exception as e:
+            logger.warning("researcher.extract_claims_failed", error=str(e))
+        return []
+    
+    async def _store_source(self, task_id: str, url: str, title: str, snippet: str, quality: float) -> int:
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc
+        query = """INSERT INTO research_sources (
+            task_id, url, title, snippet, source_type, domain, credibility_score, trust_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"""
+        return await self.db._run_query(
+            query, task_id, url, title, snippet,
+            "Web", domain, quality / 10.0, quality / 10.0,
+            is_write=True
+        )
 
     async def _search_duckduckgo(self, query: str) -> List[Dict[str, str]]:
         """DuckDuckGo HTML search scraper fallback."""
@@ -145,7 +309,6 @@ class ResearchAgent:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(url, headers=headers)
                 if resp.status_code == 200:
-                    # Simple regex-less extraction or basic string parsing
                     from bs4 import BeautifulSoup
                     soup = BeautifulSoup(resp.text, "html.parser")
                     results = []
@@ -166,117 +329,15 @@ class ResearchAgent:
             logger.warning("researcher.web_search_failed", query=query, error=str(e))
         return []
 
-    def _evaluate_credibility(self, url: str) -> Dict[str, Any]:
-        domain = url.split("//")[-1].split("/")[0]
-        
-        if any(edu in domain for edu in [".edu", "arxiv.org", "ieee.org", "researchgate.net"]):
-            source_type = "Academic Paper"
-            credibility = 0.95
-            trust = 0.95
-        elif any(gov in domain for gov in [".gov", ".nic.in", "gov."]):
-            source_type = "Government"
-            credibility = 0.90
-            trust = 0.90
-        elif any(org in domain for org in ["wikipedia.org", "w3.org", "github.com", "readthedocs.io"]):
-            source_type = "Official Documentation"
-            credibility = 0.85
-            trust = 0.85
-        elif any(news in domain for news in ["nytimes.com", "bbc.com", "reuters.com", "bloomberg.com", "techcrunch.com"]):
-            source_type = "News"
-            credibility = 0.80
-            trust = 0.80
-        elif "reddit.com" in domain:
-            source_type = "Reddit"
-            credibility = 0.30
-            trust = 0.40
-        elif any(forum in domain for forum in ["stackoverflow.com", "stackexchange.com", "quora.com"]):
-            source_type = "Forum"
-            credibility = 0.50
-            trust = 0.60
-        elif "medium.com" in domain or "blogspot.com" in domain:
-            source_type = "Blog"
-            credibility = 0.40
-            trust = 0.50
-        else:
-            source_type = "News" if "news" in domain else "Blog"
-            credibility = 0.60
-            trust = 0.60
-            
-        return {
-            "source_type": source_type,
-            "credibility_score": credibility,
-            "trust_score": trust,
-            "domain": domain,
-            "pub_date": "2026-01-01", # Default fallback date
-            "author": "Field Expert"
-        }
-
-    async def _extract_facts_from_source(self, title: str, snippet: str) -> List[str]:
-        prompt = f"""You are a research analysis agent.
-Extract 3-5 key technical facts/observations from this source snippet about: "{title}".
-Snippet: "{snippet}"
-Return a JSON array of strings. Do not include markdown wraps or backticks outside the valid JSON.
-"""
-        try:
-            llm_resp = await self.llm.chat(
-                messages=[{"role": "user", "content": prompt}],
-                system="You are an expert research facts extractor."
-            )
-            content_blocks = llm_resp.get("content", [])
-            reply_text = content_blocks[0].get("text", "") if content_blocks else "[]"
-            
-            cleaned = reply_text.strip()
-            if cleaned.startswith("```json"):
-                cleaned = cleaned[7:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            cleaned = cleaned.strip()
-            
-            facts = json.loads(cleaned)
-            if isinstance(facts, list):
-                return facts
-        except Exception:
-            pass
-        return [f"Key data points related to {title}."]
-
-    async def _generate_fallback_facts(self, topic: str) -> List[str]:
-        prompt = f"""You are a research database model.
-Provide 3 key verified facts/concepts related to this topic: "{topic}".
-Return a JSON array of strings. Do not include markdown wraps or backticks outside the valid JSON.
-"""
-        try:
-            llm_resp = await self.llm.chat(
-                messages=[{"role": "user", "content": prompt}],
-                system="You are a verified technical facts provider."
-            )
-            content_blocks = llm_resp.get("content", [])
-            reply_text = content_blocks[0].get("text", "") if content_blocks else "[]"
-            
-            cleaned = reply_text.strip()
-            if cleaned.startswith("```json"):
-                cleaned = cleaned[7:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            cleaned = cleaned.strip()
-            
-            facts = json.loads(cleaned)
-            if isinstance(facts, list):
-                return facts
-        except Exception:
-            pass
-        return [f"General verified components of {topic}."]
-
     async def _ingest_local_files_if_any(self, task_id: str, topic: str) -> None:
         """Scan workspace folder for files matching the topic and save them in local_knowledge."""
         from pathlib import Path
         import glob
         
-        # Look in workspace root and subfolders
         workspace_dir = Path("c:/Users/mayan/Free_claude_codde")
         if not workspace_dir.is_dir():
             return
             
-        # Search for .pdf, .docx, .md matching the topic name
         search_pattern = f"*{topic.split()[0]}*"
         matched = []
         for ext in ["*.md", "*.txt"]:

@@ -179,6 +179,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     research_orchestrator = ResearchOrchestrator(persistent_memory, llm, bus)
     tools.register(ResearchPipelineTool(research_orchestrator))
 
+    # 6.6 Init Chief of Staff Pipeline
+    from mether.services.chief_of_staff import ChiefOfStaffOrchestrator
+    chief_of_staff_orchestrator = ChiefOfStaffOrchestrator(persistent_memory, llm, bus)
+
     # 7. Init METHERAgent
     agent = METHERAgent(llm=llm, tools=tools, memory=memory, bus=bus, persistent_memory=persistent_memory)
     await agent.start()
@@ -193,6 +197,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.agent = agent
     app.state.google_auth = google_auth
     app.state.research_orchestrator = research_orchestrator
+    app.state.chief_of_staff_orchestrator = chief_of_staff_orchestrator
     app.state.ws_client_count = 0
 
     log.info(

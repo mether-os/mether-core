@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useMetherStore } from "@/stores/metherStore";
 import { useResearchStore } from "@/stores/researchStore";
+import { useChiefOfStaffStore } from "@/stores/chiefOfStaffStore";
 import config from "../../config";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -675,6 +676,92 @@ const RightPanel = () => {
 
       {/* Section 5 — Research Pipeline */}
       <ResearchPipelineControl />
+
+      {/* Divider */}
+      <div className="my-2 h-px bg-primary/15 shrink-0" />
+
+      {/* Section 6 — Chief of Staff */}
+      <ChiefOfStaffControl />
+    </div>
+  );
+}
+
+function ChiefOfStaffControl() {
+  const setOpen = useChiefOfStaffStore((s) => s.setOpen);
+  const stats = useChiefOfStaffStore((s) => s.stats);
+
+  // Auto fetch stats on mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (config.apiKey) {
+        headers["X-METHER-KEY"] = config.apiKey;
+      }
+      try {
+        const res = await fetch(`${config.backendUrl}/api/v1/cos/dashboard`, { headers });
+        const data = await res.json();
+        if (data && data.stats) {
+          useChiefOfStaffStore.getState().setStats(data.stats);
+          useChiefOfStaffStore.getState().setGoals(data.goals || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch Chief of Staff stats:", err);
+      }
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="shrink-0">
+      <SectionHeader title="CHIEF OF STAFF" />
+      <div className="flex flex-col gap-2 mt-1">
+        {stats && (
+          <div 
+            className="flex flex-col gap-1.5 p-2 bg-primary/5 border border-primary/10 rounded-sm relative overflow-hidden"
+            style={{
+              background: "linear-gradient(180deg, rgba(139,92,246,0.02) 0%, rgba(139,92,246,0.06) 100%)",
+            }}
+          >
+            <div className="flex justify-between items-center text-[9px] font-mono text-outline-variant">
+              <span>ACTIVE STREAK</span>
+              <span className="text-success font-bold font-mono">
+                🔥 {stats.current_streak} DAYS
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center text-[9px] font-mono text-outline-variant">
+              <span>PENDING PRIORITIES</span>
+              <span className="text-primary font-bold font-mono">
+                {stats.pending_tasks_count}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center text-[9px] font-mono text-outline-variant">
+              <span>OVERDUE BLOCKERS</span>
+              <span className={`font-bold font-mono ${stats.overdue_tasks_count > 0 ? "text-error" : "text-primary"}`}>
+                {stats.overdue_tasks_count}
+              </span>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setOpen(true)}
+          className="hud-button w-full relative overflow-hidden group py-2"
+          style={{
+            borderColor: "rgba(139,92,246,0.35)",
+            background: "linear-gradient(135deg, rgba(139,92,246,0.03) 0%, rgba(168,85,247,0.08) 100%)",
+          }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-secondary/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none" />
+          
+          <div className="flex items-center justify-center gap-1.5 text-[9px] tracking-widest font-bold font-mono text-secondary">
+            <span className="w-1.5 h-1.5 bg-secondary rounded-full animate-pulse" style={{ boxShadow: "0 0 6px #c084fc" }} />
+            CHIEF OF STAFF CONTROL
+          </div>
+        </button>
+      </div>
     </div>
   );
 }

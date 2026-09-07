@@ -65,3 +65,11 @@ screenshots/
 tmp/
 temp/
 .tmp/
+
+# SQLite & Data
+*.sqlite
+*.sqlite3
+*.db
+backend/data/*.db
+data/
+*.tsbuildinfo

@@ -6,6 +6,7 @@ import { WhatsAppPing } from "@/components/WhatsAppPing/WhatsAppPing";
 import { ConfirmDialog } from "@/components/ConfirmDialog/ConfirmDialog";
 import { WhatsAppQRModal } from "@/components/WhatsAppQRModal/WhatsAppQRModal";
 import { ResearchDashboardModal } from "@/components/ResearchPipeline/ResearchDashboardModal";
+import { ChiefOfStaffDashboardModal } from "@/components/ChiefOfStaff/ChiefOfStaffDashboardModal";
 import { TerminalFeed } from "@/components/TerminalFeed/TerminalFeed";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -350,6 +351,7 @@ export default function HUDLayout({
       <ConfirmDialog />
       <WhatsAppQRModal />
       <ResearchDashboardModal />
+      <ChiefOfStaffDashboardModal />
       <TerminalFeed />
     </div>
   );

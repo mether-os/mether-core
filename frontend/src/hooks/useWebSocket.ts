@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { useMetherStore } from "@/stores/metherStore";
 import { useResearchStore } from "@/stores/researchStore";
+import { useChiefOfStaffStore } from "@/stores/chiefOfStaffStore";
 import type { ConnectionStatus } from "@/stores/metherStore";
 import config from "../config";
 
@@ -231,12 +232,15 @@ export function useWebSocket(): WebSocketHook {
               topic: payload.topic || store.taskState?.topic || "Research Task",
               status: payload.status || "running",
               stage: payload.stage || "collecting",
-              depth: payload.depth || "deep",
-              length_target: payload.length_target || "20_pages",
+              depth: payload.depth || store.taskState?.depth || "deep",
+              length_target: payload.length_target || store.taskState?.length_target || "20_pages",
               progress_percent: payload.progress || 0.0,
               estimated_completion_time: payload.eta || null,
               output_path: payload.output_path || null,
               error_message: payload.error_message || null,
+              research_mode: payload.research_mode || store.taskState?.research_mode || "balanced",
+              target_audience: payload.target_audience || store.taskState?.target_audience || "researcher",
+              human_review_enabled: payload.human_review_enabled ?? store.taskState?.human_review_enabled ?? 0,
             });
             
             if (payload.details && payload.details.outline) {
@@ -248,6 +252,35 @@ export function useWebSocket(): WebSocketHook {
             
             addLog("AGENT", `[RESEARCH] ${payload.message}`);
           }
+          break;
+        }
+        case "cos_progress": {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const payload = msg as any;
+          const store = useChiefOfStaffStore.getState();
+          store.setProgressMessage(payload.message || "");
+          store.setProgressPercent(payload.progress || 0.0);
+          addLog("AGENT", `[CHIEF OF STAFF] ${payload.message}`);
+          break;
+        }
+        case "cos_update": {
+          const store = useChiefOfStaffStore.getState();
+          const headers: Record<string, string> = { "Content-Type": "application/json" };
+          if (config.apiKey) {
+            headers["X-METHER-KEY"] = config.apiKey;
+          }
+          fetch(`${config.backendUrl}/api/v1/cos/dashboard`, { headers })
+            .then(res => res.json())
+            .then(data => {
+              if (data) {
+                store.setGoals(data.goals || []);
+                store.setDaily(data.daily || null);
+                store.setReview(data.review || null);
+                store.setRecommendations(data.recommendations || "");
+                store.setStats(data.stats || null);
+              }
+            })
+            .catch(err => console.error("Failed to sync COS WebSocket update:", err));
           break;
         }
         default:
